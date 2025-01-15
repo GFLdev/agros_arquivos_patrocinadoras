@@ -110,24 +110,19 @@ func main() {
 	ConfigMiddleware(e)
 
 	// Grupos
-	adminGroup := e.Group("/admin")
+	//adminGroup := e.Group("/admin")
 
-	// SPA
-	if viper.GetString("ENVIRONMENT") == "production" {
-		e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
-			Filesystem: http.Dir("./frontend/dist"),
-			HTML5:      true,
-		}))
-	} else {
-		res, err := http.Get("http: //localhost:5173/")
-		if err != nil {
-			log.Fatalf("Erro na obtenção da página estática:\n\t%s\n", err)
-		}
-
-		e.Static("/", "")
-	}
+	// Sistema de arquivos
+	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
+		Filesystem: http.Dir("./frontend/dist"),
+	}))
 
 	// Rotas
+	e.GET("/", func(c echo.Context) error {
+		c.Response().Header().Set("Content-Type", "text/html")
+
+		return nil
+	})
 	e.POST("/login", handlers.LoginHandler)
 	e.POST("/download", handlers.DownloadFileHandler)
 
