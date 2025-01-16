@@ -9,27 +9,26 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
-// LoadConfig carrega as configurações nas variáveis de ambiente.
+// LoadConfig carrega as configurações do servidor.
 func LoadConfig() {
-	log.Println("Carregando variáveis de ambiente")
-	viper.SetDefault("ENVIRONMENT", "development")
+	log.Println("Carregando arquivo de configurações")
+	viper.SetDefault("environment", "development")
 
-	// Caminho do arquivo .env
+	// Caminho do arquivo config.json
 	viper.AddConfigPath(".")
 	// Nome do arquivo
-	viper.SetConfigName(".env")
+	viper.SetConfigName("config.json")
 	// Extensão do arquivos
-	viper.SetConfigType("env")
+	viper.SetConfigType("json")
 	// Leitura
 	err := viper.ReadInConfig()
 	if err != nil {
 		log.Fatalf("Erro fatal no arquivo de configuração: %s\n", err)
 	}
 
-	env := viper.GetString("ENVIRONMENT")
+	env := viper.GetString("environment")
 	if env == "production" {
 		log.Println("Configurando servidor de produção")
 	} else if env == "development" {
@@ -45,7 +44,7 @@ func ConfigMiddleware(e *echo.Echo) {
 
 	corsConfig := middleware.CORSConfig{
 		AllowCredentials: true,
-		AllowOrigins:     strings.Split(viper.GetString("ORIGINS"), ","),
+		AllowOrigins:     viper.GetStringSlice("origins"),
 		AllowMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
@@ -60,6 +59,9 @@ func ConfigMiddleware(e *echo.Echo) {
 		},
 	}
 
+	// Redirecionamento para HTTPS
+	e.Pre(middleware.HTTPSRedirect())
+
 	e.Use(
 		// Limitações de requisições IP/segundo
 		middleware.RateLimiter(
@@ -72,13 +74,17 @@ func ConfigMiddleware(e *echo.Echo) {
 		middleware.Gzip(),
 		// CORS
 		middleware.CORSWithConfig(corsConfig),
+		// Sistema de arquivos estáticos
+		middleware.StaticWithConfig(middleware.StaticConfig{
+			Filesystem: http.Dir("./frontend/dist"),
+		}),
 	)
 }
 
 // Serve inicializa o servidor echo.
 func Serve(e *echo.Echo) {
-	env := viper.GetString("ENVIRONMENT")
-	port := viper.GetInt("PORT")
+	env := viper.GetString("environment")
+	port := viper.GetInt("port")
 	if env == "production" {
 		log.Printf("Iniciando servidor de produção na porta %d\n", port)
 
@@ -88,8 +94,8 @@ func Serve(e *echo.Echo) {
 		}
 	} else if env == "development" {
 		log.Printf("Iniciando servidor de desenvolvimento na porta %d\n", port)
-		certFile := viper.GetString("CERT_FILE")
-		keyFile := viper.GetString("KEY_FILE")
+		certFile := viper.GetString("cert_file")
+		keyFile := viper.GetString("key_file")
 
 		err := e.StartTLS(":"+strconv.Itoa(port), certFile, keyFile)
 		if err != nil {
@@ -107,15 +113,11 @@ func main() {
 	// Servidor Echo
 	e := echo.New()
 	e.HideBanner = true
+	e.IPExtractor = echo.ExtractIPFromXFFHeader()
 	ConfigMiddleware(e)
 
 	// Grupos
 	//adminGroup := e.Group("/admin")
-
-	// Sistema de arquivos
-	e.Use(middleware.StaticWithConfig(middleware.StaticConfig{
-		Filesystem: http.Dir("./frontend/dist"),
-	}))
 
 	// Rotas
 	e.GET("/", func(c echo.Context) error {

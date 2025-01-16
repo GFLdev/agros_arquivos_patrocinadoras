@@ -1,8 +1,11 @@
 package handlers
 
 import (
-	"github.com/labstack/echo/v4"
+	"encoding/json"
+	"fmt"
 	"net/http"
+
+	"github.com/labstack/echo/v4"
 )
 
 // LoginHandler gerencia o processo de login.
@@ -43,10 +46,18 @@ func LoginHandler(c echo.Context) error {
 			})
 	}
 
+	resJSON, err := json.MarshalIndent(res, "", "    ")
+	if err != nil {
+		resJSON = []byte(fmt.Sprintf(
+			"{\n    \"user\": \"%s\"\n    \"authenticated\": %t\n}",
+			res.User,
+			res.Authenticated,
+		))
+	}
 	LogMessage(
 		c,
 		"Resposta enviada a "+c.RealIP(),
-		LogDetails{"Res": body},
+		LogDetails{"Res": "\n" + string(resJSON)},
 	)
 
 	return nil

@@ -18,7 +18,7 @@ func formatDetails(details LogDetails) string {
 
 	var fDetails strings.Builder
 	for key, value := range details {
-		fDetails.WriteString(fmt.Sprintf("\t%s: %v\n", key, value))
+		fDetails.WriteString(fmt.Sprintf("%s: %v\n", key, value))
 	}
 
 	return fDetails.String()

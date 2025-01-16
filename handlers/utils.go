@@ -24,7 +24,7 @@ func BodyUnmarshall(c echo.Context, v interface{}) error {
 		LogMessage(
 			c,
 			"Erro ao desagrupar o corpo da requisição de "+c.RealIP(),
-			LogDetails{"Req": string(bodyJSON), "Err": err.Error()},
+			LogDetails{"Req": "\n" + string(bodyJSON), "Err": err.Error()},
 		)
 
 		return err
@@ -33,7 +33,7 @@ func BodyUnmarshall(c echo.Context, v interface{}) error {
 	LogMessage(
 		c,
 		"Requisição recebida de "+c.RealIP(),
-		LogDetails{"Req": v},
+		LogDetails{"Req": "\n" + string(bodyJSON)},
 	)
 
 	return nil
