@@ -17,3 +17,8 @@ go.work.sum
 **.pem
 
 config.json
+
+**/logs/
+**.log
+
+**/db
