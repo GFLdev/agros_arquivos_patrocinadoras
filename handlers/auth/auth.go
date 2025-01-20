@@ -1,6 +1,7 @@
-package main
+package auth
 
 import (
+	"agros_arquivos_patrocinadoras/handlers"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/viper"
@@ -29,7 +30,7 @@ func GetJWTExpirationTime() time.Duration {
 
 // GenerateToken gera token JWT.
 func GenerateToken(
-	l *LoginRequest,
+	l *handlers.LoginReq,
 	c echo.Context,
 	exp time.Time,
 ) (string, error) {
@@ -63,7 +64,7 @@ func setTokenCookie(c echo.Context, token string, exp time.Time) {
 }
 
 // setUserCookie cria cookie que armazena o token JWT.
-func setUserCookie(c echo.Context, l *LoginRequest, exp time.Time) {
+func setUserCookie(c echo.Context, l *handlers.LoginReq, exp time.Time) {
 	cookie := new(http.Cookie)
 	cookie.Name = "user"
 	cookie.Value = l.Username

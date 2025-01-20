@@ -1,6 +1,7 @@
-package main
+package config
 
 import (
+	"agros_arquivos_patrocinadoras/handlers"
 	"encoding/json"
 	"go.uber.org/zap"
 	"io"
@@ -8,7 +9,7 @@ import (
 )
 
 // LoadConfig carrega as configurações do servidor.
-func LoadConfig(ctx *AppContext) *Config {
+func LoadConfig(ctx *handlers.AppContext) *handlers.Config {
 	ctx.Logger.Info("Carregando arquivo de configurações")
 
 	// Abertura do arquivo de configuração
@@ -18,7 +19,14 @@ func LoadConfig(ctx *AppContext) *Config {
 			zap.Error(err),
 		)
 	}
-	defer file.Close()
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			ctx.Logger.Fatal("Não foi possível fechar arquivo de configuração",
+				zap.Error(err),
+			)
+		}
+	}(file)
 
 	// Leitura do arquivo
 	jsonPayload, err := io.ReadAll(file)
@@ -29,7 +37,7 @@ func LoadConfig(ctx *AppContext) *Config {
 	}
 
 	// Desagrupamento do JSON
-	config := &Config{}
+	config := &handlers.Config{}
 	err = json.Unmarshal(jsonPayload, config)
 	if err != nil {
 		ctx.Logger.Fatal("Não foi possível desagrupar dados de configuração",

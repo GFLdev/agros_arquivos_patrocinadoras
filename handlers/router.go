@@ -1,4 +1,4 @@
-package main
+package handlers
 
 import (
 	"github.com/labstack/echo/v4"
@@ -23,81 +23,79 @@ func ConfigRoutes(e *echo.Echo, ctx *AppContext) {
 	e.POST("/login", LoginHandler)
 
 	// Usuário
-	userGroup := e.Group("/user/:id")
 	// Usuário - Categorias
-	userCategoryGroup := userGroup.Group("/category")
-	userCategoryGroup.GET("/", func(c echo.Context) error {
+	e.GET("/category", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	userCategoryGroup.POST("/", func(c echo.Context) error {
+	e.POST("/category", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
 	// Usuário - Arquivos
-	userFileGroup := userGroup.Group("/file")
-	userFileGroup.GET("/", func(c echo.Context) error {
+	e.GET("/category/file", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	userFileGroup.POST("/", func(c echo.Context) error {
+	e.POST("/category/file", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
 
 	// Administrador
-	adminGroup := e.Group("/admin")
 	// Administrador - Usuários
-	adminUserGroup := adminGroup.Group("/user")
-	adminUserGroup.GET("/", func(c echo.Context) error {
+	e.GET("/admin/user", AllUsersHandler)
+	e.POST("/admin/user/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminUserGroup.POST("/:id", func(c echo.Context) error {
+	e.PATCH("/admin/user/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminUserGroup.PATCH("/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	adminUserGroup.DELETE("/:id", func(c echo.Context) error {
+	e.DELETE("/admin/user/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
 	// Administrador - Categorias de arquivos
-	adminCategoryGroup := adminGroup.Group("/category")
-	adminCategoryGroup.GET("/", func(c echo.Context) error {
+	e.GET("/admin/category", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminCategoryGroup.POST("/", func(c echo.Context) error {
+	e.GET("/admin/category/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminCategoryGroup.PATCH("/", func(c echo.Context) error {
+	e.POST("/admin/category/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminCategoryGroup.DELETE("/", func(c echo.Context) error {
+	e.PATCH("/admin/category/:id", func(c echo.Context) error {
+		c.Response().Header().Add("Content-Type", "application/json")
+		return c.JSON(http.StatusOK, nil)
+	})
+	e.DELETE("/admin/category/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
 	// Administrador - Arquivos
-	adminFileGroup := adminCategoryGroup.Group("/file")
-	adminFileGroup.GET("/", func(c echo.Context) error {
+	e.GET("/admin/file", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminFileGroup.POST("/", func(c echo.Context) error {
+	e.GET("/admin/file/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminFileGroup.PATCH("/", func(c echo.Context) error {
+	e.POST("/admin/file/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
-	adminFileGroup.DELETE("/", func(c echo.Context) error {
+	e.PATCH("/admin/file/:id", func(c echo.Context) error {
+		c.Response().Header().Add("Content-Type", "application/json")
+		return c.JSON(http.StatusOK, nil)
+	})
+	e.DELETE("/admin/file/:id", func(c echo.Context) error {
 		c.Response().Header().Add("Content-Type", "application/json")
 		return c.JSON(http.StatusOK, nil)
 	})
