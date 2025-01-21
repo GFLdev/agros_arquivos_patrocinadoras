@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"github.com/google/uuid"
 	"net/http"
 
@@ -20,14 +19,14 @@ func DeleteUserHandler(c echo.Context) error {
 
 	// Exclusão
 	ctx.Repo.Lock()
-	ok := ctx.Repo.DeleteUserById(userId)
+	err := ctx.Repo.DeleteUserById(userId)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não encontrado",
-			Error:   fmt.Errorf("id de usuário não encontrado"),
+			Error:   err,
 		})
 	}
 
@@ -49,14 +48,14 @@ func DeleteCategoryHandler(c echo.Context) error {
 
 	// Exclusão
 	ctx.Repo.Lock()
-	ok := ctx.Repo.DeleteCategoryById(userId, categId)
+	err := ctx.Repo.DeleteCategoryById(userId, categId)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não encontrada",
-			Error:   fmt.Errorf("id de categoria não encontrado"),
+			Error:   err,
 		})
 	}
 
@@ -79,14 +78,14 @@ func DeleteFileHandler(c echo.Context) error {
 
 	// Exclusão
 	ctx.Repo.Lock()
-	ok := ctx.Repo.DeleteFileById(userId, categId, fileId)
+	err := ctx.Repo.DeleteFileById(userId, categId, fileId)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Arquivo não encontrado",
-			Error:   fmt.Errorf("id de arquivo não encontrado"),
+			Error:   err,
 		})
 	}
 

@@ -1,10 +1,10 @@
 package main
 
 import (
-	"agros_arquivos_patrocinadoras/clogger"
-	config2 "agros_arquivos_patrocinadoras/config"
+	"agros_arquivos_patrocinadoras/config"
 	"agros_arquivos_patrocinadoras/db"
 	"agros_arquivos_patrocinadoras/handlers"
+	"agros_arquivos_patrocinadoras/logger"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -42,13 +42,13 @@ func Serve(e *echo.Echo, ctx *handlers.AppContext) {
 	}
 }
 
-func firstSetup(logger *zap.Logger) {
-	logger.Info("Configurando aplicação pela primeira vez")
+func firstSetup(logr *zap.Logger) {
+	logr.Info("Configurando aplicação pela primeira vez")
 
 	// Criação da pasta com os arquivos, caso não exista
 	err := os.MkdirAll("repo", os.ModePerm)
 	if err != nil {
-		logger.Fatal("Erro ao criar diretório do repositório", zap.Error(err))
+		logr.Fatal("Erro ao criar diretório do repositório", zap.Error(err))
 	}
 
 	// Novo repositório de arquivos
@@ -58,9 +58,9 @@ func firstSetup(logger *zap.Logger) {
 	}
 
 	// Escrita do arquivo de rastreamento dos arquivos
-	err = db.StructToFile[db.Repo]("repo/track.json", &newRepo, logger)
+	err = db.StructToFile[db.Repo]("repo/track.json", &newRepo, logr)
 	if err != nil {
-		logger.Fatal("Erro na escrita de repo/track.json", zap.Error(err))
+		logr.Fatal("Erro na escrita de repo/track.json", zap.Error(err))
 	}
 }
 
@@ -72,26 +72,26 @@ func init() {
 	}
 
 	// Logger
-	logger := clogger.CreateLogger()
+	logr := logger.CreateLogger()
 
 	// Caso não exista o arquivo de rastreamento dos arquivos, execute a
 	// primeira configuração da aplicação
 	_, err = os.Stat("repo/track.json")
 	if errors.Is(err, os.ErrNotExist) {
-		firstSetup(logger)
+		firstSetup(logr)
 	}
 }
 
 func main() {
 	// Contexto da aplicação
 	ctx := &handlers.AppContext{
-		Logger: clogger.CreateLogger(),
+		Logger: logger.CreateLogger(),
 	}
 	ctx.Logger.Info("Iniciando aplicação")
 
 	// Configurações
-	config := config2.LoadConfig(ctx)
-	ctx.Config = config
+	cfg := config.LoadConfig(ctx)
+	ctx.Config = cfg
 
 	// Repositório
 	repo, err := db.GetFileRepo(ctx.Logger)

@@ -1,4 +1,4 @@
-package clogger
+package logger
 
 import (
 	"go.uber.org/zap"

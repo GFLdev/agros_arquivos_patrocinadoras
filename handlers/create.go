@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"agros_arquivos_patrocinadoras/db"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -25,8 +26,10 @@ func CreateUserHandler(c echo.Context) error {
 		)
 	}
 
+	req := db.CreateUserParams{Name: body.Name}
+
 	ctx.Repo.Lock()
-	err = ctx.Repo.CreateUser(body.Name)
+	err = ctx.Repo.CreateUser(req)
 	defer ctx.Repo.Unlock()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError,
@@ -50,8 +53,6 @@ func CreateCategoryHandler(c echo.Context) error {
 		return err
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-
 	// Ler o corpo da requisição
 	body, err := BodyUnmarshall[NameInputReq](c)
 	if err != nil {
@@ -63,8 +64,13 @@ func CreateCategoryHandler(c echo.Context) error {
 		)
 	}
 
+	req := db.CreateCategoryParams{
+		UserId: uuid.MustParse(c.Param("userId")),
+		Name:   body.Name,
+	}
+
 	ctx.Repo.Lock()
-	err = ctx.Repo.CreateCategory(userId, body.Name)
+	err = ctx.Repo.CreateCategory(req)
 	defer ctx.Repo.Unlock()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError,
@@ -102,14 +108,16 @@ func CreateFileHandler(c echo.Context) error {
 		)
 	}
 
+	req := db.CreateFileParams{
+		UserId:   userId,
+		CategId:  categId,
+		Name:     body.Name,
+		FileType: body.FileType,
+		Content:  body.Content,
+	}
+
 	ctx.Repo.Lock()
-	err = ctx.Repo.CreateFile(
-		userId,
-		categId,
-		body.Name,
-		body.FileType,
-		body.Content,
-	)
+	err = ctx.Repo.CreateFile(req)
 	defer ctx.Repo.Unlock()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError,

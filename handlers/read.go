@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -15,7 +16,13 @@ func AllUsersHandler(c echo.Context) error {
 	}
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetAllUsers()
+	res, ok := ctx.Repo.GetAllUsers()
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Nenhum usuário encontrado",
+			Error:   fmt.Errorf("repositório não tem nenhum usuário"),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
@@ -33,7 +40,13 @@ func UserByIdHandler(c echo.Context) error {
 	userId := uuid.MustParse(c.Param("userId"))
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetUserById(userId)
+	res, ok := ctx.Repo.GetUserById(userId)
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Usuário não encontrado",
+			Error:   fmt.Errorf("usuário %s não encontrado", userId.String()),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
@@ -51,7 +64,13 @@ func AllCategoriesHandler(c echo.Context) error {
 	userId := uuid.MustParse(c.Param("userId"))
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetAllCategories(userId)
+	res, ok := ctx.Repo.GetAllCategories(userId)
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Nenhuma categoria encontrada",
+			Error:   fmt.Errorf("usuário %s não tem nenhuma categoria", userId.String()),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
@@ -70,7 +89,16 @@ func CategoryByIdHandler(c echo.Context) error {
 	categId := uuid.MustParse(c.Param("categId"))
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetCategoryById(userId, categId)
+	res, ok := ctx.Repo.GetCategoryById(userId, categId)
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Categoria não encontrada",
+			Error: fmt.Errorf("usuário %s não tem categoria %s",
+				userId.String(),
+				categId.String(),
+			),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
@@ -90,7 +118,17 @@ func AllFilesHandler(c echo.Context) error {
 	categId := uuid.MustParse(c.Param("categId"))
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetAllFiles(userId, categId)
+	res, ok := ctx.Repo.GetAllFiles(userId, categId)
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Nenhum arquivo encontrado",
+			Error: fmt.Errorf("categoria %s de usuário %s não tem nenhum"+
+				" arquivo",
+				userId.String(),
+				categId.String(),
+			),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
@@ -110,7 +148,17 @@ func FileByIdHandler(c echo.Context) error {
 	fileId := uuid.MustParse(c.Param("fileId"))
 
 	ctx.Repo.Lock()
-	res := ctx.Repo.GetFileById(userId, categId, fileId)
+	res, ok := ctx.Repo.GetFileById(userId, categId, fileId)
+	if !ok {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Arquivo não encontrado",
+			Error: fmt.Errorf("categoria %s de usuário %s não tem arquivo %s",
+				userId.String(),
+				categId.String(),
+				fileId.String(),
+			),
+		})
+	}
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")

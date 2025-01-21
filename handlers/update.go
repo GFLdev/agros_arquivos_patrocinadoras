@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"fmt"
+	"agros_arquivos_patrocinadoras/db"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -15,8 +15,6 @@ func UpdateUserHandler(c echo.Context) error {
 		return err
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-
 	// Ler o corpo da requisição
 	body, err := BodyUnmarshall[NameInputReq](c)
 	if err != nil {
@@ -28,16 +26,21 @@ func UpdateUserHandler(c echo.Context) error {
 		)
 	}
 
+	params := db.UpdateUserParams{
+		UserId: uuid.MustParse(c.Param("userId")),
+		Name:   body.Name,
+	}
+
 	// Atualização
 	ctx.Repo.Lock()
-	ok := ctx.Repo.UpdateUserById(userId, body.Name)
+	err = ctx.Repo.UpdateUserById(params)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não encontrado",
-			Error:   fmt.Errorf("id de usuário não encontrado"),
+			Error:   err,
 		})
 	}
 
@@ -54,9 +57,6 @@ func UpdateCategoryHandler(c echo.Context) error {
 		return err
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
-
 	// Ler o corpo da requisição
 	body, err := BodyUnmarshall[NameInputReq](c)
 	if err != nil {
@@ -68,16 +68,22 @@ func UpdateCategoryHandler(c echo.Context) error {
 		)
 	}
 
+	params := db.UpdateCategoryParams{
+		UserId:  uuid.MustParse(c.Param("userId")),
+		CategId: uuid.MustParse(c.Param("categId")),
+		Name:    body.Name,
+	}
+
 	// Atualização
 	ctx.Repo.Lock()
-	ok := ctx.Repo.UpdateCategoryById(userId, categId, body.Name)
+	err = ctx.Repo.UpdateCategoryById(params)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não encontrada",
-			Error:   fmt.Errorf("id de categoria não encontrado"),
+			Error:   err,
 		})
 	}
 
@@ -94,12 +100,8 @@ func UpdateFileHandler(c echo.Context) error {
 		return err
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
-	fileId := uuid.MustParse(c.Param("fileId"))
-
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[NameInputReq](c)
+	body, err := BodyUnmarshall[FileInputReq](c)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -109,16 +111,25 @@ func UpdateFileHandler(c echo.Context) error {
 		)
 	}
 
+	params := db.UpdateFileParams{
+		UserId:   uuid.MustParse(c.Param("userId")),
+		CategId:  uuid.MustParse(c.Param("categId")),
+		FileId:   uuid.MustParse(c.Param("fileId")),
+		Name:     body.Name,
+		FileType: body.FileType,
+		Content:  body.Content,
+	}
+
 	// Atualização
 	ctx.Repo.Lock()
-	ok := ctx.Repo.UpdateFileById(userId, categId, fileId, body.Name)
+	err = ctx.Repo.UpdateFileById(params)
 	defer ctx.Repo.Unlock()
 
 	c.Response().Header().Add("Content-Type", "application/json")
-	if !ok {
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não encontrado",
-			Error:   fmt.Errorf("id de usuário não encontrado"),
+			Error:   err,
 		})
 	}
 
