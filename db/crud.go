@@ -25,10 +25,10 @@ func (repo *Repo) CreateUser(name string) error {
 	newUser := User{
 		Id:         id,
 		Name:       name,
-		Categories: nil,
+		Categories: make(map[uuid.UUID]Category),
 		UpdatedAt:  ts,
 	}
-	dirName := fmt.Sprintf("repo/user%d_%d", id, ts)
+	dirName := fmt.Sprintf("repo/user_%s", id.String())
 
 	// Cria o diretório deste usuário
 	err := os.MkdirAll(dirName, os.ModePerm)
@@ -37,7 +37,7 @@ func (repo *Repo) CreateUser(name string) error {
 	}
 	newUser.DirName = dirName
 
-	// Adiciona ao repositório
+	// Adiciona usuário ao repositório
 	repo.Users[id] = newUser
 	repo.UpdatedAt = ts
 	return nil
@@ -56,10 +56,10 @@ func (repo *Repo) CreateCategory(userId uuid.UUID, name string) error {
 	newCategory := Category{
 		Id:        id,
 		Name:      name,
-		Files:     nil,
+		Files:     make(map[uuid.UUID]File),
 		UpdatedAt: ts,
 	}
-	dirName := fmt.Sprintf("%s/categ%d_%d", user.DirName, id, ts)
+	dirName := fmt.Sprintf("%s/categ_%s", user.DirName, id.String())
 
 	// Cria o diretório da nova categoria
 	err := os.MkdirAll(dirName, os.ModePerm)
@@ -102,7 +102,7 @@ func (repo *Repo) CreateFile(
 		Name:      name,
 		UpdatedAt: ts,
 	}
-	basename := fmt.Sprintf("%s/file%d_%d", categ.DirName, id, ts)
+	basename := fmt.Sprintf("%s/file_%s", categ.DirName, id)
 
 	// Salva o conteúdo deste arquivo em disco
 	err := WriteToFile(basename, content, clogger.CreateLogger())
@@ -111,7 +111,11 @@ func (repo *Repo) CreateFile(
 	}
 	newFile.Basename = basename
 
-	// Adiciona ao repositório
+	// Adiciona arquivo ao repositório
+	// Se for o primeiro
+	if len(categ.Files) == 0 {
+		categ.Files = make(map[uuid.UUID]File)
+	}
 	categ.Files[id] = newFile
 	categ.UpdatedAt = ts
 	user.Categories[categId] = categ
