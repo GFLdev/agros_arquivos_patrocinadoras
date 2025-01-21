@@ -80,6 +80,7 @@ func (repo *Repo) CreateFile(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	name string,
+	filetype string,
 	content []byte,
 ) error {
 	// Verifica de existência do usuário
@@ -102,14 +103,14 @@ func (repo *Repo) CreateFile(
 		Name:      name,
 		UpdatedAt: ts,
 	}
-	basename := fmt.Sprintf("%s/file_%s", categ.DirName, id)
+	filename := fmt.Sprintf("%s/file_%s.%s", categ.DirName, id, filetype)
 
 	// Salva o conteúdo deste arquivo em disco
-	err := WriteToFile(basename, content, clogger.CreateLogger())
+	err := WriteToFile(filename, content, clogger.CreateLogger())
 	if err != nil {
 		return err
 	}
-	newFile.Basename = basename
+	newFile.Filename = filename
 
 	// Adiciona arquivo ao repositório
 	// Se for o primeiro

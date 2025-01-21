@@ -103,7 +103,13 @@ func CreateFileHandler(c echo.Context) error {
 	}
 
 	ctx.Repo.Lock()
-	err = ctx.Repo.CreateFile(userId, categId, body.Name, body.Content)
+	err = ctx.Repo.CreateFile(
+		userId,
+		categId,
+		body.Name,
+		body.FileType,
+		body.Content,
+	)
 	defer ctx.Repo.Unlock()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError,

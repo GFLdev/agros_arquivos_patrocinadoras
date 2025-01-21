@@ -7,7 +7,7 @@ import (
 type File struct {
 	Id        uuid.UUID `json:"id"`
 	Name      string    `json:"name"`
-	Basename  string    `json:"basename"`
+	Filename  string    `json:"filename"`
 	UpdatedAt int64     `json:"updated_at"`
 }
 
