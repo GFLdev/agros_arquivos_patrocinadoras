@@ -28,6 +28,10 @@ type ErrorRes struct {
 	Error   error  `json:"error" validate:"required"`
 }
 
+type GenericRes struct {
+	Message string `json:"message" validate:"required"`
+}
+
 type LoginReq struct {
 	Username string `json:"username" validate:"required"`
 	Password string `json:"password" validate:"required"`
@@ -36,4 +40,13 @@ type LoginReq struct {
 type LoginRes struct {
 	User          string `json:"user" validate:"required"`
 	Authenticated bool   `json:"authenticated" validate:"required"`
+}
+
+type NameInputReq struct {
+	Name string `json:"name" validate:"required"`
+}
+
+type FileInputReq struct {
+	NameInputReq
+	Content []byte `json:"content" validate:"required"`
 }

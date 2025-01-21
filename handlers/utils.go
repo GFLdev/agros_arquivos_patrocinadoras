@@ -2,10 +2,12 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"io"
+	"net/http"
 )
 
 // BodyUnmarshall lê e desagrupa o body de uma requisição.
@@ -73,4 +75,15 @@ func LogHTTPDetails(
 	default:
 		appCtx.Logger.Info(msg, allFields...)
 	}
+}
+
+func checkAuthentication(c echo.Context) error {
+	if !IsAuthenticated(c) {
+		c.Response().Header().Add("Content-Type", "application/json")
+		return c.JSON(http.StatusForbidden, ErrorRes{
+			Message: "Não autorizado",
+			Error:   fmt.Errorf("requisição por usuário não autorizado"),
+		})
+	}
+	return nil
 }

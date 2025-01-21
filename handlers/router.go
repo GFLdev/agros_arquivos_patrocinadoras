@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"github.com/labstack/echo/v4"
-	"net/http"
 )
 
 // ConfigRoutes define as rotas principais da aplicação, separando as
@@ -23,80 +22,23 @@ func ConfigRoutes(e *echo.Echo, ctx *AppContext) {
 	e.POST("/login", LoginHandler)
 
 	// Usuário
-	// Usuário - Categorias
-	e.GET("/category", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.POST("/category", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	// Usuário - Arquivos
-	e.GET("/category/file", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.POST("/category/file", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
+	e.POST("/user", CreateUserHandler)
+	e.GET("/user", AllUsersHandler)
+	e.GET("/user/:userId", UserByIdHandler)
+	e.PATCH("/user/:userId", UpdateUserHandler)
+	e.DELETE("/user/:userId", DeleteUserHandler)
 
-	// Administrador
-	// Administrador - Usuários
-	e.GET("/admin/user", AllUsersHandler)
-	e.POST("/admin/user/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.PATCH("/admin/user/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.DELETE("/admin/user/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	// Administrador - Categorias de arquivos
-	e.GET("/admin/category", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.GET("/admin/category/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.POST("/admin/category/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.PATCH("/admin/category/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.DELETE("/admin/category/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	// Administrador - Arquivos
-	e.GET("/admin/file", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.GET("/admin/file/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.POST("/admin/file/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.PATCH("/admin/file/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
-	e.DELETE("/admin/file/:id", func(c echo.Context) error {
-		c.Response().Header().Add("Content-Type", "application/json")
-		return c.JSON(http.StatusOK, nil)
-	})
+	// Categorias
+	e.POST("/user/:userId/category", CreateCategoryHandler)
+	e.GET("/user/:userId/category", AllCategoriesHandler)
+	e.GET("/user/:userId/category/:categId", CategoryByIdHandler)
+	e.PATCH("/user/:userId/category/:categId", UpdateCategoryHandler)
+	e.DELETE("/user/:userId/category/:categId", DeleteCategoryHandler)
+
+	// Arquivos
+	e.POST("/user/:userId/category/:categId/file", CreateFileHandler)
+	e.GET("/user/:userId/category/:categId/file", AllFilesHandler)
+	e.GET("/user/:userId/category/:categId/file/:fileId", FileByIdHandler)
+	e.PATCH("/user/:userId/category/:categId/file/:fileId", UpdateFileHandler)
+	e.DELETE("/user/:userId/category/:categId/file/:fileId", DeleteFileHandler)
 }
