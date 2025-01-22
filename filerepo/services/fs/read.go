@@ -1,9 +1,9 @@
-package db
+package fs
 
 import "github.com/google/uuid"
 
-func (repo *Repo) GetUserById(userId uuid.UUID) (EntityData, bool) {
-	user, ok := repo.Users[userId]
+func (fs *FS) GetUserById(userId uuid.UUID) (EntityData, bool) {
+	user, ok := fs.Users[userId]
 	if !ok {
 		return EntityData{}, false
 	}
@@ -15,13 +15,13 @@ func (repo *Repo) GetUserById(userId uuid.UUID) (EntityData, bool) {
 	}, true
 }
 
-func (repo *Repo) GetAllUsers() ([]EntityData, bool) {
-	if repo.Users == nil {
+func (fs *FS) GetAllUsers() ([]EntityData, bool) {
+	if fs.Users == nil {
 		return []EntityData{}, false
 	}
 
 	var users []EntityData
-	for _, user := range repo.Users {
+	for _, user := range fs.Users {
 		users = append(users, EntityData{
 			Id:        user.Id,
 			Name:      user.Name,
@@ -31,11 +31,11 @@ func (repo *Repo) GetAllUsers() ([]EntityData, bool) {
 	return users, true
 }
 
-func (repo *Repo) GetCategoryById(
+func (fs *FS) GetCategoryById(
 	userId uuid.UUID,
 	categId uuid.UUID,
 ) (EntityData, bool) {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return EntityData{}, false
 	}
@@ -52,8 +52,8 @@ func (repo *Repo) GetCategoryById(
 	}, true
 }
 
-func (repo *Repo) GetAllCategories(userId uuid.UUID) ([]EntityData, bool) {
-	user, ok := repo.Users[userId]
+func (fs *FS) GetAllCategories(userId uuid.UUID) ([]EntityData, bool) {
+	user, ok := fs.Users[userId]
 	if !ok {
 		return []EntityData{}, false
 	}
@@ -70,12 +70,12 @@ func (repo *Repo) GetAllCategories(userId uuid.UUID) ([]EntityData, bool) {
 	return categs, true
 }
 
-func (repo *Repo) GetFileById(
+func (fs *FS) GetFileById(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	fileId uuid.UUID,
 ) (FileData, bool) {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return FileData{}, false
 	}
@@ -99,11 +99,11 @@ func (repo *Repo) GetFileById(
 	}, true
 }
 
-func (repo *Repo) GetAllFiles(
+func (fs *FS) GetAllFiles(
 	userId uuid.UUID,
 	categId uuid.UUID,
 ) ([]EntityData, bool) {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return []EntityData{}, false
 	}
@@ -125,12 +125,12 @@ func (repo *Repo) GetAllFiles(
 	return files, true
 }
 
-func (repo *Repo) GetFileAttachment(
+func (fs *FS) GetFileAttachment(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	fileId uuid.UUID,
 ) (AttachmentData, bool) {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return AttachmentData{}, false
 	}

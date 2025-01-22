@@ -1,7 +1,7 @@
-package db
+package fs
 
 import (
-	"agros_arquivos_patrocinadoras/logger"
+	"agros_arquivos_patrocinadoras/filerepo/services/logger"
 	"fmt"
 	"github.com/google/uuid"
 	"os"
@@ -9,7 +9,7 @@ import (
 )
 
 // CreateUser cria um novo usuário no repositório.
-func (repo *Repo) CreateUser(p CreateUserParams) error {
+func (fs *FS) CreateUser(p CreateUserParams) error {
 	// Cria nova instância de usuário
 	id := uuid.New()
 	ts := time.Now().Unix()
@@ -19,7 +19,7 @@ func (repo *Repo) CreateUser(p CreateUserParams) error {
 		Categories: make(map[uuid.UUID]Category),
 		UpdatedAt:  ts,
 	}
-	path := fmt.Sprintf("repo/user_%s", id.String())
+	path := fmt.Sprintf("fs/user_%s", id.String())
 
 	// Cria o diretório deste usuário
 	err := os.MkdirAll(path, os.ModePerm)
@@ -29,20 +29,20 @@ func (repo *Repo) CreateUser(p CreateUserParams) error {
 	newUser.Path = path
 
 	// Adiciona usuário ao repositório
-	repo.Users[id] = newUser
-	repo.UpdatedAt = ts
+	fs.Users[id] = newUser
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
 // CreateCategory cria uma nova categoria associada a um usuário.
-func (repo *Repo) CreateCategory(p CreateCategoryParams) error {
+func (fs *FS) CreateCategory(p CreateCategoryParams) error {
 	// Verifica de existência do usuário
-	user, ok := repo.Users[p.UserId]
+	user, ok := fs.Users[p.UserId]
 	if !ok {
 		return fmt.Errorf("usuário não encontrado no repositório")
 	}
@@ -68,20 +68,20 @@ func (repo *Repo) CreateCategory(p CreateCategoryParams) error {
 	// Adiciona categoria ao repositório
 	user.Categories[id] = newCategory
 	user.UpdatedAt = ts
-	repo.Users[p.UserId] = user
-	repo.UpdatedAt = ts
+	fs.Users[p.UserId] = user
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
 // CreateFile cria um novo arquivo numa categoria associada a um usuário.
-func (repo *Repo) CreateFile(p CreateFileParams) error {
+func (fs *FS) CreateFile(p CreateFileParams) error {
 	// Verifica de existência do usuário
-	user, ok := repo.Users[p.UserId]
+	user, ok := fs.Users[p.UserId]
 	if !ok {
 		return fmt.Errorf("usuário não encontrado no repositório")
 	}
@@ -120,12 +120,12 @@ func (repo *Repo) CreateFile(p CreateFileParams) error {
 	categ.UpdatedAt = ts
 	user.Categories[p.CategId] = categ
 	user.UpdatedAt = ts
-	repo.Users[p.UserId] = user
-	repo.UpdatedAt = ts
+	fs.Users[p.UserId] = user
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }

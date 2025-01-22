@@ -1,23 +1,27 @@
 package main
 
 import (
-	"agros_arquivos_patrocinadoras/config"
-	"agros_arquivos_patrocinadoras/db"
-	"agros_arquivos_patrocinadoras/handlers"
-	"agros_arquivos_patrocinadoras/logger"
+	fr "agros_arquivos_patrocinadoras/filerepo"
+	"agros_arquivos_patrocinadoras/filerepo/db"
+	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/filerepo/services/config"
+	"agros_arquivos_patrocinadoras/filerepo/services/fs"
+	"agros_arquivos_patrocinadoras/filerepo/services/logger"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"os"
+	"os/signal"
 	"strconv"
-	"sync"
+	"strings"
+	"syscall"
 	"time"
 )
 
 // Serve inicializa o servidor echo.
-func Serve(e *echo.Echo, ctx *handlers.AppContext) {
+func Serve(e *echo.Echo, ctx *services.AppWrapper) {
 	var err error
 	if ctx.Config.Environment == "production" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de produção na porta %d", ctx.Config.Port))
@@ -42,6 +46,24 @@ func Serve(e *echo.Echo, ctx *handlers.AppContext) {
 	}
 }
 
+func handleSIGINT(c chan os.Signal, logr *zap.Logger) {
+	for sig := range c {
+		if sig == syscall.SIGINT {
+			logr.Warn("SIGINT recebido")
+
+			var i string
+			fmt.Print("Deseja finalizar a aplicação? [S/n] (default: n) ")
+			_, err := fmt.Scanln(&i)
+			if err == nil && strings.ToUpper(i) == "S" {
+				logr.Info("Finalizando a aplicação")
+				os.Exit(0)
+			} else {
+				logr.Info("SIGINT interrompido")
+			}
+		}
+	}
+}
+
 func firstSetup(logr *zap.Logger) {
 	logr.Info("Configurando aplicação pela primeira vez")
 
@@ -52,13 +74,13 @@ func firstSetup(logr *zap.Logger) {
 	}
 
 	// Novo repositório de arquivos
-	newRepo := db.Repo{
-		Users:     map[uuid.UUID]db.User{},
+	newRepo := fs.FS{
+		Users:     map[uuid.UUID]fs.User{},
 		UpdatedAt: time.Now().Unix(),
 	}
 
 	// Escrita do arquivo de rastreamento dos arquivos
-	err = db.StructToFile[db.Repo]("repo/track.json", &newRepo, logr)
+	err = fs.StructToFile[fs.FS]("repo/track.json", &newRepo, logr)
 	if err != nil {
 		logr.Fatal("Erro na escrita de repo/track.json", zap.Error(err))
 	}
@@ -83,36 +105,41 @@ func init() {
 }
 
 func main() {
-	// Contexto da aplicação
-	ctx := &handlers.AppContext{
-		Logger: logger.CreateLogger(),
-	}
-	ctx.Logger.Info("Iniciando aplicação")
+	// Logger
+	logr := logger.CreateLogger()
+
+	logr.Info("Iniciando aplicação")
 
 	// Configurações
-	cfg := config.LoadConfig(ctx)
-	ctx.Config = cfg
+	cfg := config.LoadConfig(logr)
 
-	// Repositório
-	repo, err := db.GetFileRepo(ctx.Logger)
+	// Sistema de arquivos
+	appFs, err := fs.GetFS(logr)
 	if err != nil {
-		ctx.Logger.Fatal("Erro ao obter repositório de arquivos",
+		logr.Fatal("Erro ao obter repositório de arquivos",
 			zap.Error(err),
 		)
 	}
-	ctx.Repo = struct {
-		*db.Repo
-		*sync.Mutex
-	}{repo, new(sync.Mutex)}
+
+	// Banco de dados
+	dataBase := db.GetSqlDB(cfg.Database, logr)
+
+	// Contexto da aplicação
+	ctx := services.NewAppWrapper(logr, cfg, appFs, dataBase)
 
 	// Servidor Echo
 	e := echo.New()
 	e.HideBanner = true
 	e.IPExtractor = echo.ExtractIPFromXFFHeader()
-	handlers.ConfigMiddleware(e, ctx)
+	fr.ConfigMiddleware(e, ctx)
 
 	// Rotas
-	handlers.ConfigRoutes(e, ctx)
+	fr.ConfigRoutes(e, ctx)
+
+	// Handler para SIGINT (^C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go handleSIGINT(c, logr)
 
 	// Inicializar servidor
 	Serve(e, ctx)

@@ -1,12 +1,10 @@
-package db
+package fs
 
-import (
-	"github.com/google/uuid"
-)
+import "github.com/google/uuid"
 
-// ---------------
-//   Repositório
-// ---------------
+// -----------------------
+//   Sistema de arquivos
+// -----------------------
 
 // File representa a estrutura de um arquivo no sistema.
 type File struct {
@@ -37,8 +35,8 @@ type User struct {
 	UpdatedAt  int64                  `json:"updated_at" validate:"required"`
 }
 
-// Repo representa o repositório contendo todos os usuários e metadados.
-type Repo struct {
+// FS representa o sistema de arquivos contendo todos os usuários e metadados.
+type FS struct {
 	Users     map[uuid.UUID]User `json:"users" validate:"required"`
 	UpdatedAt int64              `json:"updated_at" validate:"required"`
 }

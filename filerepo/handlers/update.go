@@ -1,7 +1,9 @@
 package handlers
 
 import (
-	"agros_arquivos_patrocinadoras/db"
+	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/filerepo/services/fs"
+	"agros_arquivos_patrocinadoras/filerepo/utils"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -9,109 +11,109 @@ import (
 
 // UpdateUserHandler gerencia a modificação de um usuário pelo seu ID.
 func UpdateUserHandler(c echo.Context) error {
-	ctx := GetAppContext(c)
+	ctx := services.GetContext(c)
 
-	if err := checkAuthentication(c); err != nil {
+	if err := utils.CheckAuthentication(c); err != nil {
 		return err
 	}
 
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[NameInputReq](c)
+	body, err := utils.BodyUnmarshall[utils.NameInputReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
-			ErrorRes{
+			utils.ErrorRes{
 				Message: "Body da requisição inválido",
 				Error:   err,
 			},
 		)
 	}
 
-	params := db.UpdateUserParams{
+	params := fs.UpdateUserParams{
 		UserId: uuid.MustParse(c.Param("userId")),
 		Name:   body.Name,
 	}
 
 	// Atualização
-	ctx.Repo.Lock()
-	err = ctx.Repo.UpdateUserById(params)
-	defer ctx.Repo.Unlock()
+	ctx.FSServ.Mux.Lock()
+	err = ctx.FSServ.FS.UpdateUserById(params)
+	defer ctx.FSServ.Mux.Unlock()
 
-	c.Response().Header().Add("Content-Type", "application/json")
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
+		return c.JSON(http.StatusNotFound, utils.ErrorRes{
 			Message: "Usuário não encontrado",
 			Error:   err,
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
+	return c.JSON(http.StatusOK, utils.GenericRes{
 		Message: "Usuário alterado com sucesso",
 	})
 }
 
 // UpdateCategoryHandler gerencia a modificação de uma categoria pelo seu ID.
 func UpdateCategoryHandler(c echo.Context) error {
-	ctx := GetAppContext(c)
+	ctx := services.GetContext(c)
 
-	if err := checkAuthentication(c); err != nil {
+	if err := utils.CheckAuthentication(c); err != nil {
 		return err
 	}
 
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[NameInputReq](c)
+	body, err := utils.BodyUnmarshall[utils.NameInputReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
-			ErrorRes{
+			utils.ErrorRes{
 				Message: "Body da requisição inválido",
 				Error:   err,
 			},
 		)
 	}
 
-	params := db.UpdateCategoryParams{
+	params := fs.UpdateCategoryParams{
 		UserId:  uuid.MustParse(c.Param("userId")),
 		CategId: uuid.MustParse(c.Param("categId")),
 		Name:    body.Name,
 	}
 
 	// Atualização
-	ctx.Repo.Lock()
-	err = ctx.Repo.UpdateCategoryById(params)
-	defer ctx.Repo.Unlock()
+	ctx.FSServ.Mux.Lock()
+	err = ctx.FSServ.FS.UpdateCategoryById(params)
+	defer ctx.FSServ.Mux.Unlock()
 
-	c.Response().Header().Add("Content-Type", "application/json")
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
+		return c.JSON(http.StatusNotFound, utils.ErrorRes{
 			Message: "Categoria não encontrada",
 			Error:   err,
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
+	return c.JSON(http.StatusOK, utils.GenericRes{
 		Message: "Categoria alterada com sucesso",
 	})
 }
 
 // UpdateFileHandler gerencia a modificação de um arquivo pelo seu ID.
 func UpdateFileHandler(c echo.Context) error {
-	ctx := GetAppContext(c)
+	ctx := services.GetContext(c)
 
-	if err := checkAuthentication(c); err != nil {
+	if err := utils.CheckAuthentication(c); err != nil {
 		return err
 	}
 
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[FileInputReq](c)
+	body, err := utils.BodyUnmarshall[utils.FileInputReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
-			ErrorRes{
+			utils.ErrorRes{
 				Message: "Body da requisição inválido",
 				Error:   err,
 			},
 		)
 	}
 
-	params := db.UpdateFileParams{
+	params := fs.UpdateFileParams{
 		UserId:    uuid.MustParse(c.Param("userId")),
 		CategId:   uuid.MustParse(c.Param("categId")),
 		FileId:    uuid.MustParse(c.Param("fileId")),
@@ -122,19 +124,19 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	// Atualização
-	ctx.Repo.Lock()
-	err = ctx.Repo.UpdateFileById(params)
-	defer ctx.Repo.Unlock()
+	ctx.FSServ.Mux.Lock()
+	err = ctx.FSServ.FS.UpdateFileById(params)
+	defer ctx.FSServ.Mux.Unlock()
 
-	c.Response().Header().Add("Content-Type", "application/json")
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
+		return c.JSON(http.StatusNotFound, utils.ErrorRes{
 			Message: "Usuário não encontrado",
 			Error:   err,
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
+	return c.JSON(http.StatusOK, utils.GenericRes{
 		Message: "Arquivo alterado com sucesso",
 	})
 }

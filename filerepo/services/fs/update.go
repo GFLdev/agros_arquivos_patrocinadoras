@@ -1,15 +1,15 @@
-package db
+package fs
 
 import (
-	"agros_arquivos_patrocinadoras/logger"
+	"agros_arquivos_patrocinadoras/filerepo/services/logger"
 	"fmt"
 	"time"
 )
 
 // UpdateUserById atualiza os dados de um usuário com base no ID fornecido.
-func (repo *Repo) UpdateUserById(p UpdateUserParams) error {
+func (fs *FS) UpdateUserById(p UpdateUserParams) error {
 	// Verificar existência
-	user, ok := repo.Users[p.UserId]
+	user, ok := fs.Users[p.UserId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", p.UserId.String())
 	}
@@ -18,20 +18,20 @@ func (repo *Repo) UpdateUserById(p UpdateUserParams) error {
 	ts := time.Now().Unix()
 	user.Name = p.Name
 	user.UpdatedAt = ts
-	repo.Users[p.UserId] = user
-	repo.UpdatedAt = ts
+	fs.Users[p.UserId] = user
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
 // UpdateCategoryById atualiza os dados de uma categoria com base no ID fornecido.
-func (repo *Repo) UpdateCategoryById(p UpdateCategoryParams) error {
+func (fs *FS) UpdateCategoryById(p UpdateCategoryParams) error {
 	// Verificar existência
-	user, ok := repo.Users[p.UserId]
+	user, ok := fs.Users[p.UserId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", p.UserId.String())
 	}
@@ -47,20 +47,20 @@ func (repo *Repo) UpdateCategoryById(p UpdateCategoryParams) error {
 	categ.UpdatedAt = ts
 	user.Categories[p.CategId] = categ
 	user.UpdatedAt = ts
-	repo.Users[p.UserId] = user
-	repo.UpdatedAt = ts
+	fs.Users[p.UserId] = user
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
 // UpdateFileById atualiza os dados de um arquivo com base no ID fornecido.
-func (repo *Repo) UpdateFileById(p UpdateFileParams) error {
+func (fs *FS) UpdateFileById(p UpdateFileParams) error {
 	// Verificar existência
-	user, ok := repo.Users[p.UserId]
+	user, ok := fs.Users[p.UserId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", p.UserId.String())
 	}
@@ -109,12 +109,12 @@ func (repo *Repo) UpdateFileById(p UpdateFileParams) error {
 	categ.UpdatedAt = ts
 	user.Categories[p.CategId] = categ
 	user.UpdatedAt = ts
-	repo.Users[p.UserId] = user
-	repo.UpdatedAt = ts
+	fs.Users[p.UserId] = user
+	fs.UpdatedAt = ts
 
 	// Salvar em disco
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }

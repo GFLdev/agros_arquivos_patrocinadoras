@@ -12,7 +12,7 @@ func CreateLogger() *zap.Logger {
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	encoderConfig.EncodeLevel = zapcore.CapitalLevelEncoder
+	encoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	ts := strconv.FormatInt(time.Now().Unix(), 10)
 
@@ -26,10 +26,6 @@ func CreateLogger() *zap.Logger {
 		OutputPaths: []string{
 			"stdout",
 			"logs/runtime_" + ts + ".log",
-		},
-		ErrorOutputPaths: []string{
-			"stderr",
-			"logs/error_" + ts + ".log",
 		},
 	}
 

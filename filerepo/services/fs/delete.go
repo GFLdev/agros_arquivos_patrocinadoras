@@ -1,13 +1,13 @@
-package db
+package fs
 
 import (
-	"agros_arquivos_patrocinadoras/logger"
+	"agros_arquivos_patrocinadoras/filerepo/services/logger"
 	"fmt"
 	"github.com/google/uuid"
 )
 
-func (repo *Repo) DeleteUserById(userId uuid.UUID) error {
-	user, ok := repo.Users[userId]
+func (fs *FS) DeleteUserById(userId uuid.UUID) error {
+	user, ok := fs.Users[userId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", userId.String())
 	}
@@ -19,18 +19,18 @@ func (repo *Repo) DeleteUserById(userId uuid.UUID) error {
 	}
 
 	// Excluir usuário
-	delete(repo.Users, userId)
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	delete(fs.Users, userId)
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
-func (repo *Repo) DeleteCategoryById(
+func (fs *FS) DeleteCategoryById(
 	userId uuid.UUID,
 	categId uuid.UUID,
 ) error {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", userId.String())
 	}
@@ -47,19 +47,19 @@ func (repo *Repo) DeleteCategoryById(
 	}
 
 	// Excluir categoria
-	delete(repo.Users[userId].Categories, categId)
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	delete(fs.Users[userId].Categories, categId)
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }
 
-func (repo *Repo) DeleteFileById(
+func (fs *FS) DeleteFileById(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	fileId uuid.UUID,
 ) error {
-	user, ok := repo.Users[userId]
+	user, ok := fs.Users[userId]
 	if !ok {
 		return fmt.Errorf("usuário %s não encontrado", userId.String())
 	}
@@ -81,9 +81,9 @@ func (repo *Repo) DeleteFileById(
 	}
 
 	// Excluir rastreamento do arquivo
-	delete(repo.Users[userId].Categories[categId].Files, fileId)
-	return StructToFile[Repo]("repo/track.json",
-		repo,
+	delete(fs.Users[userId].Categories[categId].Files, fileId)
+	return StructToFile[FS]("fs/track.json",
+		fs,
 		logger.CreateLogger(),
 	)
 }

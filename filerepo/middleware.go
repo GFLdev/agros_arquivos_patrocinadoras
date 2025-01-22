@@ -1,6 +1,8 @@
-package handlers
+package filerepo
 
 import (
+	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/filerepo/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -9,9 +11,9 @@ import (
 	"net/http"
 )
 
-// ContextMiddleware é o middleware para implementar AppContext como
+// ContextMiddleware é o middleware para implementar services.AppWrapper como
 // contexto padrão a ser usado por echo.Echo.
-func ContextMiddleware(ctx *AppContext) echo.MiddlewareFunc {
+func ContextMiddleware(ctx *services.AppWrapper) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			c.Set("appContext", ctx)
@@ -21,7 +23,7 @@ func ContextMiddleware(ctx *AppContext) echo.MiddlewareFunc {
 }
 
 // ConfigMiddleware configura os middlewares a serem utilizados pelo servidor.
-func ConfigMiddleware(e *echo.Echo, ctx *AppContext) {
+func ConfigMiddleware(e *echo.Echo, ctx *services.AppWrapper) {
 	ctx.Logger.Info("Configurando middlewares")
 
 	corsConfig := middleware.CORSConfig{
@@ -50,7 +52,9 @@ func ConfigMiddleware(e *echo.Echo, ctx *AppContext) {
 	e.Use(
 		// Middleware para capturar requisições e respostas
 		middleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-			LogHTTPDetails(c,
+			utils.LogHTTPDetails(
+				c,
+				ctx.Logger,
 				zapcore.InfoLevel,
 				"HTTP request-response",
 				zap.Int("status", c.Response().Status),
@@ -58,7 +62,7 @@ func ConfigMiddleware(e *echo.Echo, ctx *AppContext) {
 				zap.String("response_body", string(resBody)),
 			)
 		}),
-		// Implementar AppContext
+		// Implementar app.AppWrapper
 		ContextMiddleware(ctx),
 		// Limitações de requisições IP/segundo
 		middleware.RateLimiter(
@@ -76,9 +80,16 @@ func ConfigMiddleware(e *echo.Echo, ctx *AppContext) {
 		middleware.Recover(),
 		// CORS
 		middleware.CORSWithConfig(corsConfig),
+		// JWT
+		//echojwt.WithConfig(echojwt.Config{
+		//	NewClaimsFunc: func(c echo.AppWrapper) jwt.Claims {
+		//		return new(auth.CustomClaims)
+		//	},
+		//	SigningKey: []byte(ctx.Config.JwtSecret),
+		//}),
 		// Sistema de arquivos estáticos
 		middleware.StaticWithConfig(middleware.StaticConfig{
-			Filesystem: http.Dir("./frontend/dist"),
+			Filesystem: http.Dir("frontend/dist"),
 		}),
 	)
 }

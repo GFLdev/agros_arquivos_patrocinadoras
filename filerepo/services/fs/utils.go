@@ -1,4 +1,4 @@
-package db
+package fs
 
 import (
 	"bufio"
@@ -11,9 +11,9 @@ import (
 	"os"
 )
 
-func GetFileRepo(logr *zap.Logger) (*Repo, error) {
+func GetFS(logr *zap.Logger) (*FS, error) {
 	// Carregamento do arquivo de rastreamento
-	repo, err := FileToStruct[Repo]("repo/track.json", logr)
+	repo, err := FileToStruct[FS]("repo/track.json", logr)
 	if err != nil {
 		return nil, err
 	}

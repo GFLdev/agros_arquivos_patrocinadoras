@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/filerepo/utils"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -8,9 +10,9 @@ import (
 
 // DownloadHandler gerencia o envio de um arquivo para download.
 func DownloadHandler(c echo.Context) error {
-	ctx := GetAppContext(c)
+	ctx := services.GetContext(c)
 
-	if err := checkAuthentication(c); err != nil {
+	if err := utils.CheckAuthentication(c); err != nil {
 		return err
 	}
 
@@ -18,12 +20,12 @@ func DownloadHandler(c echo.Context) error {
 	categId := uuid.MustParse(c.Param("categId"))
 	fileId := uuid.MustParse(c.Param("fileId"))
 
-	ctx.Repo.Lock()
-	attach, ok := ctx.Repo.GetFileAttachment(userId, categId, fileId)
+	ctx.FSServ.Mux.Lock()
+	attach, ok := ctx.FSServ.FS.GetFileAttachment(userId, categId, fileId)
 	if !ok {
 		return c.NoContent(http.StatusNotFound)
 	}
-	defer ctx.Repo.Unlock()
+	defer ctx.FSServ.Mux.Unlock()
 
 	return c.Attachment(attach.Path, attach.Name)
 }
