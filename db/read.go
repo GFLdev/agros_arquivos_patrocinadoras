@@ -2,26 +2,27 @@ package db
 
 import "github.com/google/uuid"
 
-func (repo *Repo) GetUserById(userId uuid.UUID) (QueryData, bool) {
+func (repo *Repo) GetUserById(userId uuid.UUID) (EntityData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok {
-		return QueryData{}, false
+	if !ok {
+		return EntityData{}, false
 	}
-	return QueryData{
+
+	return EntityData{
 		Id:        user.Id,
 		Name:      user.Name,
 		UpdatedAt: user.UpdatedAt,
 	}, true
 }
 
-func (repo *Repo) GetAllUsers() ([]QueryData, bool) {
+func (repo *Repo) GetAllUsers() ([]EntityData, bool) {
 	if repo.Users == nil {
-		return []QueryData{}, false
+		return []EntityData{}, false
 	}
 
-	var users []QueryData
+	var users []EntityData
 	for _, user := range repo.Users {
-		users = append(users, QueryData{
+		users = append(users, EntityData{
 			Id:        user.Id,
 			Name:      user.Name,
 			UpdatedAt: user.UpdatedAt,
@@ -33,29 +34,39 @@ func (repo *Repo) GetAllUsers() ([]QueryData, bool) {
 func (repo *Repo) GetCategoryById(
 	userId uuid.UUID,
 	categId uuid.UUID,
-) (QueryData, bool) {
+) (EntityData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok || user.Categories == nil {
-		return QueryData{}, false
+	if !ok {
+		return EntityData{}, false
 	}
 
 	categ, ok := user.Categories[categId]
 	if !ok {
-		return QueryData{}, false
+		return EntityData{}, false
 	}
-	return QueryData{categ.Id, categ.Name, categ.UpdatedAt}, true
+
+	return EntityData{
+		Id:        categ.Id,
+		Name:      categ.Name,
+		UpdatedAt: categ.UpdatedAt,
+	}, true
 }
 
-func (repo *Repo) GetAllCategories(userId uuid.UUID) ([]QueryData, bool) {
+func (repo *Repo) GetAllCategories(userId uuid.UUID) ([]EntityData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok || user.Categories == nil {
-		return []QueryData{}, false
+	if !ok {
+		return []EntityData{}, false
 	}
 
-	categs := make([]QueryData, len(user.Categories))
+	var categs []EntityData
 	for _, categ := range user.Categories {
-		categs = append(categs, QueryData{categ.Id, categ.Name, categ.UpdatedAt})
+		categs = append(categs, EntityData{
+			Id:        categ.Id,
+			Name:      categ.Name,
+			UpdatedAt: categ.UpdatedAt,
+		})
 	}
+
 	return categs, true
 }
 
@@ -63,42 +74,54 @@ func (repo *Repo) GetFileById(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	fileId uuid.UUID,
-) (QueryData, bool) {
+) (FileData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok || user.Categories == nil {
-		return QueryData{}, false
+	if !ok {
+		return FileData{}, false
 	}
 
 	categ, ok := user.Categories[categId]
-	if !ok || categ.Files == nil {
-		return QueryData{}, false
+	if !ok {
+		return FileData{}, false
 	}
 
 	file, ok := categ.Files[fileId]
 	if !ok {
-		return QueryData{}, false
+		return FileData{}, false
 	}
-	return QueryData{file.Id, file.Name, file.UpdatedAt}, true
+
+	return FileData{
+		Id:        file.Id,
+		Name:      file.Name,
+		UpdatedAt: file.UpdatedAt,
+		FileType:  file.FileType,
+		Extension: file.Extension,
+	}, true
 }
 
 func (repo *Repo) GetAllFiles(
 	userId uuid.UUID,
 	categId uuid.UUID,
-) ([]QueryData, bool) {
+) ([]EntityData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok || user.Categories == nil {
-		return []QueryData{}, false
+	if !ok {
+		return []EntityData{}, false
 	}
 
 	categ, ok := user.Categories[categId]
-	if !ok || categ.Files == nil {
-		return []QueryData{}, false
+	if !ok {
+		return []EntityData{}, false
 	}
 
-	files := make([]QueryData, len(categ.Files))
+	var files []EntityData
 	for _, file := range categ.Files {
-		files = append(files, QueryData{file.Id, file.Name, file.UpdatedAt})
+		files = append(files, EntityData{
+			Id:        file.Id,
+			Name:      file.Name,
+			UpdatedAt: file.UpdatedAt,
+		})
 	}
+
 	return files, true
 }
 
@@ -106,22 +129,23 @@ func (repo *Repo) GetFileAttachment(
 	userId uuid.UUID,
 	categId uuid.UUID,
 	fileId uuid.UUID,
-) (FileAttachment, bool) {
+) (AttachmentData, bool) {
 	user, ok := repo.Users[userId]
-	if repo.Users == nil || !ok || user.Categories == nil {
-		return FileAttachment{}, false
+	if !ok {
+		return AttachmentData{}, false
 	}
 
 	categ, ok := user.Categories[categId]
-	if !ok || categ.Files == nil {
-		return FileAttachment{}, false
+	if !ok {
+		return AttachmentData{}, false
 	}
 
 	file, ok := categ.Files[fileId]
 	if !ok {
-		return FileAttachment{}, false
+		return AttachmentData{}, false
 	}
-	return FileAttachment{
+
+	return AttachmentData{
 		Id:        file.Id,
 		Name:      file.Name,
 		UpdatedAt: file.UpdatedAt,

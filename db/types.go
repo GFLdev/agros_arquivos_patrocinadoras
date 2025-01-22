@@ -61,27 +61,38 @@ type CreateCategoryParams struct {
 
 // CreateFileParams representa os dados necessários para criar um novo arquivo.
 type CreateFileParams struct {
-	UserId   uuid.UUID `json:"user_id" validate:"required"`
-	CategId  uuid.UUID `json:"categ_id" validate:"required"`
-	Name     string    `json:"name" validate:"required"`
-	FileType string    `json:"file_type" validate:"required"`
-	Content  []byte    `json:"content" validate:"required"`
+	UserId    uuid.UUID `json:"user_id" validate:"required"`
+	CategId   uuid.UUID `json:"categ_id" validate:"required"`
+	Name      string    `json:"name" validate:"required"`
+	FileType  string    `json:"file_type" validate:"required"`
+	Extension string    `json:"extension" validate:"required"`
+	Content   []byte    `json:"content" validate:"required"`
 }
 
 // --------
 //   READ
 // --------
 
-// QueryData representa a estrutura básica para realizar consultas.
-type QueryData struct {
+// EntityData representa a estrutura básica para realizar consultas.
+type EntityData struct {
 	Id        uuid.UUID `json:"id" validate:"required"`
 	Name      string    `json:"name" validate:"required"`
 	UpdatedAt int64     `json:"updated_at" validate:"required"`
 }
 
-// FileAttachment estende QueryData para incluir informações específicas de
+// FileData estende EntityData para incluir informações específicas de
 // arquivos.
-type FileAttachment struct {
+type FileData struct {
+	Id        uuid.UUID `json:"id" validate:"required"`
+	Name      string    `json:"name" validate:"required"`
+	FileType  string    `json:"file_type" validate:"required"`
+	Extension string    `json:"extension" validate:"required"`
+	UpdatedAt int64     `json:"updated_at" validate:"required"`
+}
+
+// AttachmentData estende FileData para incluir informações específicas de
+// arquivos para download.
+type AttachmentData struct {
 	Id        uuid.UUID `json:"id" validate:"required"`
 	Name      string    `json:"name" validate:"required"`
 	FileType  string    `json:"file_type" validate:"required"`
@@ -94,22 +105,28 @@ type FileAttachment struct {
 //   UPDATE
 // ----------
 
+// UpdateUserParams define os parâmetros necessários para atualizar informações
+// de um usuário.
 type UpdateUserParams struct {
 	UserId uuid.UUID `json:"user_id" validate:"required"`
 	Name   string    `json:"name"`
 }
 
+// UpdateCategoryParams define os parâmetros necessários para atualizar uma
+// categoria.
 type UpdateCategoryParams struct {
 	UserId  uuid.UUID `json:"user_id" validate:"required"`
 	CategId uuid.UUID `json:"categ_id" validate:"required"`
 	Name    string    `json:"name"`
 }
 
+// UpdateFileParams define os parâmetros necessários para atualizar um arquivo.
 type UpdateFileParams struct {
-	UserId   uuid.UUID `json:"user_id" validate:"required"`
-	CategId  uuid.UUID `json:"categ_id" validate:"required"`
-	FileId   uuid.UUID `json:"file_id" validate:"required"`
-	Name     string    `json:"name"`
-	FileType string    `json:"file_type"`
-	Content  []byte    `json:"content"`
+	UserId    uuid.UUID `json:"user_id" validate:"required"`
+	CategId   uuid.UUID `json:"categ_id" validate:"required"`
+	FileId    uuid.UUID `json:"file_id" validate:"required"`
+	Name      string    `json:"name"`
+	FileType  string    `json:"file_type"`
+	Extension string    `json:"extension"`
+	Content   []byte    `json:"content"`
 }

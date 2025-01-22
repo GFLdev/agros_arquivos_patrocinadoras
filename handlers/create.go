@@ -109,11 +109,12 @@ func CreateFileHandler(c echo.Context) error {
 	}
 
 	req := db.CreateFileParams{
-		UserId:   userId,
-		CategId:  categId,
-		Name:     body.Name,
-		FileType: body.FileType,
-		Content:  body.Content,
+		UserId:    userId,
+		CategId:   categId,
+		Name:      body.Name,
+		FileType:  body.FileType,
+		Extension: body.Extension,
+		Content:   body.Content,
 	}
 
 	ctx.Repo.Lock()

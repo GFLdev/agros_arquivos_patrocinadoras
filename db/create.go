@@ -95,19 +95,14 @@ func (repo *Repo) CreateFile(p CreateFileParams) error {
 	// Cria nova instância de arquivo
 	id := uuid.New()
 	ts := time.Now().Unix()
-	ext := GetExtension(p.FileType, &p.Content)
 	newFile := File{
 		Id:        id,
 		Name:      p.Name,
 		FileType:  p.FileType,
-		Extension: ext,
+		Extension: p.Extension,
 		UpdatedAt: ts,
 	}
-	path := fmt.Sprintf("%s/file_%s.%s",
-		categ.Path,
-		id,
-		GetExtension(p.FileType, &p.Content),
-	)
+	path := fmt.Sprintf("%s/file_%s", categ.Path, id)
 
 	// Salva o conteúdo deste arquivo em disco
 	err := WriteToFile(path, p.Content, logger.CreateLogger())

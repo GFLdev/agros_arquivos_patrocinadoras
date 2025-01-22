@@ -112,12 +112,13 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	params := db.UpdateFileParams{
-		UserId:   uuid.MustParse(c.Param("userId")),
-		CategId:  uuid.MustParse(c.Param("categId")),
-		FileId:   uuid.MustParse(c.Param("fileId")),
-		Name:     body.Name,
-		FileType: body.FileType,
-		Content:  body.Content,
+		UserId:    uuid.MustParse(c.Param("userId")),
+		CategId:   uuid.MustParse(c.Param("categId")),
+		FileId:    uuid.MustParse(c.Param("fileId")),
+		Name:      body.Name,
+		FileType:  body.FileType,
+		Extension: body.Extension,
+		Content:   body.Content,
 	}
 
 	// Atualização

@@ -3,8 +3,6 @@ package db
 import (
 	"agros_arquivos_patrocinadoras/logger"
 	"fmt"
-	"go.uber.org/zap"
-	"net/http"
 	"time"
 )
 
@@ -79,39 +77,26 @@ func (repo *Repo) UpdateFileById(p UpdateFileParams) error {
 
 	// Atualização
 	// Conteúdo
-	var ext string
 	if len(p.Content) > 0 {
-		// Se não houver o Mimetype, detectar e definí-lo
+		// Se não houver o Mimetype ou extensão deste novo arquivo
 		if p.FileType == "" {
-			p.FileType = http.DetectContentType(p.Content)
+			return fmt.Errorf("mimetype requerido para mudança do arquivo")
+		} else {
 		}
-		ext = GetExtension(p.FileType, &p.Content)
+
+		if p.Extension == "" {
+			return fmt.Errorf("extensão requerida para mudança do arquivo")
+		}
 
 		// Escreve em disco. Obs: manter nesta ordem para não alterar a base
 		// caso ocorra um erro na gravação do arquivo
-		err := WriteToFile(
-			file.Path+"."+file.Extension,
-			p.Content,
-			logger.CreateLogger(),
-		)
+		err := WriteToFile(file.Path, p.Content, logger.CreateLogger())
 		if err != nil {
 			return err
 		}
-	}
-	// Mimetype
-	if p.FileType != "" {
-		// Excluir arquivo antigo, caso a extensão tenha mudado
-		if ext != file.Extension {
-			err := DeleteFiles(file.Path, logger.CreateLogger())
-			if err != nil {
-				logger.CreateLogger().Warn(
-					"Não foi possível excluir o arquivo "+file.Path+"."+file.Extension,
-					zap.Error(err),
-				)
-			}
-			file.FileType = p.FileType
-			file.Extension = ext
-		}
+
+		file.FileType = p.FileType
+		file.Extension = p.Extension
 	}
 	// Nome
 	if p.Name != "" {

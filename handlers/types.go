@@ -48,6 +48,7 @@ type NameInputReq struct {
 
 type FileInputReq struct {
 	NameInputReq
-	Content  []byte `json:"content" validate:"required"`
-	FileType string `json:"file_type" validate:"required"`
+	FileType  string `json:"file_type" validate:"required"`
+	Extension string `json:"extension" validate:"required"`
+	Content   []byte `json:"content" validate:"required"`
 }
