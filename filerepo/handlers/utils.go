@@ -1,4 +1,4 @@
-package utils
+package handlers
 
 import (
 	"encoding/json"
@@ -6,8 +6,8 @@ import (
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"golang.org/x/crypto/bcrypt"
 	"io"
-	"net/http"
 )
 
 // BodyUnmarshall lê e desagrupa o body de uma requisição.
@@ -75,13 +75,11 @@ func LogHTTPDetails(
 	}
 }
 
-func CheckAuthentication(c echo.Context) error {
-	if false {
-		c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
-		return c.JSON(http.StatusForbidden, ErrorRes{
-			Message: "Não autorizado",
-			Error:   fmt.Errorf("requisição por usuário não autorizado"),
-		})
+// HashPassword gera o hash da senha usando bcrypt com um custo padrão
+func HashPassword(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", fmt.Errorf("erro ao gerar hash da senha: %v", err)
 	}
-	return nil
+	return string(hash), nil
 }

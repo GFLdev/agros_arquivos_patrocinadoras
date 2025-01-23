@@ -1,8 +1,8 @@
 package filerepo
 
 import (
+	"agros_arquivos_patrocinadoras/filerepo/handlers"
 	"agros_arquivos_patrocinadoras/filerepo/services"
-	"agros_arquivos_patrocinadoras/filerepo/utils"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -52,7 +52,7 @@ func ConfigMiddleware(e *echo.Echo, ctx *services.AppWrapper) {
 	e.Use(
 		// Middleware para capturar requisições e respostas
 		middleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-			utils.LogHTTPDetails(
+			handlers.LogHTTPDetails(
 				c,
 				ctx.Logger,
 				zapcore.InfoLevel,

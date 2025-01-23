@@ -2,7 +2,6 @@ package auth
 
 import (
 	"agros_arquivos_patrocinadoras/filerepo/services"
-	"agros_arquivos_patrocinadoras/filerepo/utils"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -17,7 +16,7 @@ type CustomClaims struct {
 }
 
 // GenerateToken gera token JWT.
-func GenerateToken(l *utils.LoginReq, c echo.Context) (string, error) {
+func GenerateToken(username string, c echo.Context) (string, error) {
 	ctx := services.GetContext(c)
 
 	// FIXME: Criar lógica de autenticação do usuário
@@ -27,7 +26,7 @@ func GenerateToken(l *utils.LoginReq, c echo.Context) (string, error) {
 	duration := time.Duration(ctx.Config.JwtExpires)
 	claims := CustomClaims{
 		UserId:   userId,
-		Username: l.Username,
+		Username: username,
 		Admin:    true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(

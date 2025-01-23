@@ -21,4 +21,4 @@ config.json
 **/logs/
 **.log
 
-repo/
+data/
