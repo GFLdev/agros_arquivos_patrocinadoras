@@ -1,30 +1,19 @@
 package config
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/db"
+	"agros_arquivos_patrocinadoras/pkg/types/config"
 	"encoding/json"
 	"go.uber.org/zap"
 	"io"
 	"os"
 )
 
-type Config struct {
-	Environment string      `json:"environment" validate:"required"`
-	Origins     []string    `json:"origins" validate:"required"`
-	Port        int         `json:"port" validate:"required"`
-	Database    db.Database `json:"database" validate:"required"`
-	JwtSecret   string      `json:"jwt_secret" validate:"required"`
-	JwtExpires  int         `json:"jwt_expires" validate:"required"`
-	CertFile    string      `json:"cert_file"`
-	KeyFile     string      `json:"key_file"`
-}
-
 // LoadConfig carrega as configurações do servidor.
-func LoadConfig(logr *zap.Logger) *Config {
+func LoadConfig(logr *zap.Logger) *config.Config {
 	logr.Info("Carregando arquivo de configurações")
 
 	// Abertura do arquivo de configuração
-	file, err := os.Open("config.json")
+	file, err := os.Open("cfg.json")
 	if err != nil {
 		logr.Fatal("Não foi possível abrir arquivo de configuração",
 			zap.Error(err),
@@ -48,8 +37,8 @@ func LoadConfig(logr *zap.Logger) *Config {
 	}
 
 	// Desagrupamento do JSON
-	config := &Config{}
-	err = json.Unmarshal(jsonPayload, config)
+	cfg := &config.Config{}
+	err = json.Unmarshal(jsonPayload, cfg)
 	if err != nil {
 		logr.Fatal("Não foi possível desagrupar dados de configuração",
 			zap.Error(err),
@@ -57,14 +46,14 @@ func LoadConfig(logr *zap.Logger) *Config {
 	}
 
 	// Logging
-	if config.Environment == "production" {
+	if cfg.Environment == "production" {
 		logr.Info("Configurando servidor de produção")
-	} else if config.Environment == "development" {
+	} else if cfg.Environment == "development" {
 		logr.Info("Configurando servidor de desenvolvimento")
 	} else {
 		logr.Warn("Ambiente não definido. Fallback para development")
-		config.Environment = "development"
+		cfg.Environment = "development"
 	}
 
-	return config
+	return cfg
 }

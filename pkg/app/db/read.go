@@ -2,14 +2,15 @@ package db
 
 import (
 	"agros_arquivos_patrocinadoras/filerepo/services/logger"
+	db2 "agros_arquivos_patrocinadoras/pkg/types/db"
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 )
 
-func QueryAllUsers(db *sql.DB) ([]UserModel, error) {
-	var users []UserModel
+func QueryAllUsers(db *sql.DB) ([]db2.UserModel, error) {
+	var users []db2.UserModel
 
 	query := `SELECT uuid_patroc
 		, nome_patroc
@@ -35,7 +36,7 @@ func QueryAllUsers(db *sql.DB) ([]UserModel, error) {
 
 	// Iterar por cada linha
 	for rows.Next() {
-		var u UserModel
+		var u db2.UserModel
 		err := rows.Scan(&u.UserId, &u.Name, &u.UpdatedAt)
 		if err != nil {
 			return users, fmt.Errorf(
@@ -50,8 +51,8 @@ func QueryAllUsers(db *sql.DB) ([]UserModel, error) {
 	return users, nil
 }
 
-func QueryUserById(db *sql.DB, userId uuid.UUID) (UserModel, error) {
-	var user UserModel
+func QueryUserById(db *sql.DB, userId uuid.UUID) (db2.UserModel, error) {
+	var user db2.UserModel
 
 	query := `SELECT uuid_patroc
 		, nome_patroc
@@ -71,8 +72,8 @@ func QueryUserById(db *sql.DB, userId uuid.UUID) (UserModel, error) {
 	return user, nil
 }
 
-func QueryAllCategories(db *sql.DB, userId uuid.UUID) ([]CategoryModel, error) {
-	var categs []CategoryModel
+func QueryAllCategories(db *sql.DB, userId uuid.UUID) ([]db2.CategoryModel, error) {
+	var categs []db2.CategoryModel
 
 	query := `SELECT uuid_categ
      	, uuid_patroc
@@ -100,7 +101,7 @@ func QueryAllCategories(db *sql.DB, userId uuid.UUID) ([]CategoryModel, error) {
 
 	// Iterar por cada linha
 	for rows.Next() {
-		var c CategoryModel
+		var c db2.CategoryModel
 		err := rows.Scan(&c.CategId, &c.UserId, &c.Name, &c.UpdatedAt)
 		if err != nil {
 			return categs, fmt.Errorf(
@@ -114,8 +115,8 @@ func QueryAllCategories(db *sql.DB, userId uuid.UUID) ([]CategoryModel, error) {
 	return categs, nil
 }
 
-func QueryCategoryById(db *sql.DB, categId uuid.UUID) (CategoryModel, error) {
-	var categ CategoryModel
+func QueryCategoryById(db *sql.DB, categId uuid.UUID) (db2.CategoryModel, error) {
+	var categ db2.CategoryModel
 
 	query := `SELECT uuid_categ
      	, uuid_patroc
@@ -137,8 +138,8 @@ func QueryCategoryById(db *sql.DB, categId uuid.UUID) (CategoryModel, error) {
 	return categ, nil
 }
 
-func QueryAllFiles(db *sql.DB, categId uuid.UUID) ([]FileModel, error) {
-	var files []FileModel
+func QueryAllFiles(db *sql.DB, categId uuid.UUID) ([]db2.FileModel, error) {
+	var files []db2.FileModel
 
 	query := `SELECT f.uuid_arquivo
 		, f.uuid_categ
@@ -168,7 +169,7 @@ func QueryAllFiles(db *sql.DB, categId uuid.UUID) ([]FileModel, error) {
 
 	// Iterar por cada linha
 	for rows.Next() {
-		var f FileModel
+		var f db2.FileModel
 		err := rows.Scan(&f.FileId, &f.CategId, &f.Name, &f.Extension, &f.Mimetype, &f.UpdatedAt)
 		if err != nil {
 			return files, fmt.Errorf(
@@ -182,8 +183,8 @@ func QueryAllFiles(db *sql.DB, categId uuid.UUID) ([]FileModel, error) {
 	return files, nil
 }
 
-func QueryFileById(db *sql.DB, fileId uuid.UUID) (FileModel, error) {
-	var file FileModel
+func QueryFileById(db *sql.DB, fileId uuid.UUID) (db2.FileModel, error) {
+	var file db2.FileModel
 
 	query := `SELECT a.uuid_arquivo
 		, a.uuid_categ

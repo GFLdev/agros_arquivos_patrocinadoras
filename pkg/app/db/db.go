@@ -1,21 +1,14 @@
 package db
 
 import (
+	"agros_arquivos_patrocinadoras/pkg/types/config"
 	"database/sql"
 	"fmt"
 	_ "github.com/sijms/go-ora/v2"
 	"go.uber.org/zap"
 )
 
-type Database struct {
-	Service  string `json:"service"`
-	Username string `json:"username"`
-	Server   string `json:"server"`
-	Port     string `json:"port"`
-	Password string `json:"password"`
-}
-
-func GetSqlDB(dbParams Database, logr *zap.Logger) *sql.DB {
+func GetSqlDB(dbParams *config.Database, logr *zap.Logger) *sql.DB {
 	// String de conexão
 	connString := fmt.Sprintf(
 		"oracle://%s:%s@%s:%s/%s",

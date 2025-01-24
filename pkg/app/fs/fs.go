@@ -2,23 +2,17 @@ package fs
 
 import "github.com/google/uuid"
 
-// -----------------------
-//   Sistema de arquivos
-// -----------------------
+type EntityType int
 
-type FS interface {
-	CreateUser(userId uuid.UUID) error
-	CreateCategory(userId uuid.UUID, categId uuid.UUID) error
-	Create(userId uuid.UUID) error
-}
+const (
+	User EntityType = iota
+	Category
+	File
+)
 
 type FileSystem struct {
 	Root string `json:"root"`
 }
-
-// --------
-//   READ
-// --------
 
 // EntityData representa a estrutura básica para realizar consultas.
 type EntityData struct {

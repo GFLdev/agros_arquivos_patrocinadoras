@@ -1,72 +1,58 @@
 package fs
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services/logger"
+	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"os"
 )
 
-// ----------
-//   CREATE
-// ----------
-
-// CreateUser cria um novo usuário no repositório.
-func (fs *FileSystem) CreateUser(userId uuid.UUID) error {
-	// Caminho
-	path := fmt.Sprintf("%s/user_%s", fs.Root, userId.String())
-
-	// Cria o diretório deste usuário
-	err := os.Mkdir(path, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("erro ao criar pasta do usuário: %v", err)
-	}
-
-	return nil
-}
-
-// CreateCategory cria uma nova categoria associada a um usuário.
-func (fs *FileSystem) CreateCategory(userId uuid.UUID, categId uuid.UUID) error {
-	// Caminho
-	path := fmt.Sprintf(
-		"%s/user_%s/categ_%s",
-		fs.Root,
-		userId.String(),
-		categId.String(),
-	)
-
-	// Cria o diretório da nova categoria
-	err := os.Mkdir(path, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("erro ao criar pasta da categoria: %v", err)
-	}
-
-	return nil
-}
-
-// CreateFile cria um novo arquivo numa categoria associada a um usuário.
-func (fs *FileSystem) CreateFile(
-	userId uuid.UUID,
-	categId uuid.UUID,
-	fileId uuid.UUID,
-	extension string,
+// CreateEntity cria uma entidade no sistema de arquivos.
+// Dependendo do tipo da entidade fornecida, pode criar:
+//
+// - Um arquivo: escreve o conteúdo especificado no caminho fornecido.
+//
+// - Um diretório: cria uma pasta para usuários ou categorias.
+//
+// Parâmetros:
+//
+// - path: caminho onde a entidade será criada.
+//
+// - content: conteúdo a ser escrito no arquivo (apenas para entidades do tipo
+// File). Pode ser nil para diretórios.
+//
+// - entity: tipo da entidade a ser criada (File, User ou Category).
+//
+// Retorno:
+//
+// - error: retorna um erro se ocorrer falha na criação da entidade ou se o tipo
+// de entidade for inválido.
+func (fs *FileSystem) CreateEntity(
+	path string,
 	content *[]byte,
+	entity EntityType,
 ) error {
-	// Caminho
-	path := fmt.Sprintf(
-		"%s/user_%s/categ_%s/file_%s%s",
-		fs.Root,
-		userId.String(),
-		categId.String(),
-		fileId.String(),
-		extension,
-	)
+	logr := logger.CreateLogger()
 
-	// Salva o conteúdo deste arquivo em disco
-	err := WriteToFile(path, *content, logger.CreateLogger())
-	if err != nil {
-		return err
+	switch entity {
+	case File:
+		if content == nil {
+			return fmt.Errorf("conteúdo não pode ser nulo ao criar um arquivo")
+		}
+		return WriteToFile(path, *content, logr)
+	case User, Category:
+		if err := os.Mkdir(path, os.ModePerm); err != nil {
+			var entityName string
+			if entity == User {
+				entityName = "usuário"
+			} else if entity == Category {
+				entityName = "categoria"
+			}
+			return fmt.Errorf("erro ao criar pasta da %s: %v", entityName, err)
+		}
+	default:
+		return fmt.Errorf("tipo de entidade inválido: %d", entity)
 	}
 
 	return nil

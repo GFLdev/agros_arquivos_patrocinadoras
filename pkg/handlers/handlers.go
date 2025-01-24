@@ -1,10 +1,10 @@
 package handlers
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/auth"
-	"agros_arquivos_patrocinadoras/filerepo/db"
 	"agros_arquivos_patrocinadoras/filerepo/services"
 	"agros_arquivos_patrocinadoras/filerepo/services/fs"
+	"agros_arquivos_patrocinadoras/pkg/app/db"
+	"agros_arquivos_patrocinadoras/pkg/auth"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -165,31 +165,6 @@ func CreateUserHandler(c echo.Context) error {
 	// Geração do Id
 	userId := uuid.New()
 
-	// Criação do diretório
-	err = ctx.FileSystem.CreateUser(userId)
-	if err != nil {
-		return c.JSON(
-			http.StatusInternalServerError,
-			ErrorRes{
-				Message: "Erro ao criar diretório do usuário",
-				Error:   err,
-			},
-		)
-	}
-
-	// Agendar a exclusão do diretório em caso de erro subsequente
-	defer func() {
-		if err != nil {
-			err = ctx.FileSystem.DeleteUser(userId)
-			if err != nil {
-				ctx.Logger.Error(
-					"Erro ao limpar arquivo lixo",
-					zap.Error(err),
-				)
-			}
-		}
-	}()
-
 	// Criptografia
 	hash, err := HashPassword(body.Password)
 	if err != nil {
@@ -202,8 +177,8 @@ func CreateUserHandler(c echo.Context) error {
 		)
 	}
 
-	// Criar usuário no banco
-	err = db.CreateUser(ctx.DB, userId, body.Name, hash)
+	// Criar usuário
+	err = db.CreateUser(ctx.DB, ctx.FileSystem, userId, body.Name, hash)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,

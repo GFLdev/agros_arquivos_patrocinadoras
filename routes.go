@@ -1,8 +1,8 @@
-package filerepo
+package main
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/handlers"
 	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/pkg/handlers"
 	"github.com/labstack/echo/v4"
 )
 

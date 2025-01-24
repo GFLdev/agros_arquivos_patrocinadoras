@@ -1,12 +1,11 @@
 package main
 
 import (
-	fr "agros_arquivos_patrocinadoras/filerepo"
-	"agros_arquivos_patrocinadoras/filerepo/db"
 	"agros_arquivos_patrocinadoras/filerepo/services"
 	"agros_arquivos_patrocinadoras/filerepo/services/config"
 	"agros_arquivos_patrocinadoras/filerepo/services/fs"
 	"agros_arquivos_patrocinadoras/filerepo/services/logger"
+	"agros_arquivos_patrocinadoras/pkg/app/db"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -131,10 +130,10 @@ func main() {
 	e := echo.New()
 	e.HideBanner = true
 	e.IPExtractor = echo.ExtractIPFromXFFHeader()
-	fr.ConfigMiddleware(e, ctx)
+	ConfigMiddleware(e, ctx)
 
 	// Rotas
-	fr.ConfigRoutes(e, ctx)
+	ConfigRoutes(e, ctx)
 
 	// Handler para SIGINT (^C)
 	c := make(chan os.Signal, 1)
