@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services"
-	"agros_arquivos_patrocinadoras/filerepo/services/fs"
+	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
 	"agros_arquivos_patrocinadoras/pkg/auth"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"net/http"
 )
 
@@ -18,7 +16,7 @@ func LoginHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Ler o corpo da requisição
 	body, err := BodyUnmarshall[LoginReq](c, ctx.Logger)
@@ -26,7 +24,7 @@ func LoginHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Body da requisição inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -46,15 +44,15 @@ func DownloadHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -66,7 +64,7 @@ func DownloadHandler(c echo.Context) error {
 			http.StatusNotFound,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -77,7 +75,7 @@ func DownloadHandler(c echo.Context) error {
 			http.StatusNotFound,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -88,43 +86,45 @@ func DownloadHandler(c echo.Context) error {
 			http.StatusNotFound,
 			ErrorRes{
 				Message: "Id de arquivo inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos metadados do arquivo
-	file, err := db.QueryFileById(ctx.DB, fileId)
+	file, err := db.QueryFileById(ctx, fileId)
 	if err != nil {
 		return c.JSON(
 			http.StatusNotFound,
 			ErrorRes{
 				Message: "Arquivo não encontrado",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Anexar arquivo
-	attach, err := ctx.FileSystem.GetFile(
+	path := fmt.Sprintf(
+		"%s/%s/%s/%s%s",
+		ctx.FileSystem.Root,
 		userId,
 		categId,
 		fileId,
-		file.Extension,
-	)
-	if err != nil {
+		file.Extension)
+	exists := ctx.FileSystem.EntityExists(path)
+	if !exists {
 		return c.JSON(
 			http.StatusNotFound,
 			ErrorRes{
 				Message: "Arquivo não encontrado",
-				Error:   err,
+				Error:   fmt.Sprintf("arquivo em %s não encontrado", path),
 			},
 		)
 	}
 
 	// Cabeçalho para o arquivo e resposta
 	c.Response().Header().Add(echo.HeaderContentType, file.Mimetype)
-	return c.Attachment(attach, file.Name)
+	return c.Attachment(path, file.Name)
 }
 
 // ----------
@@ -137,15 +137,15 @@ func CreateUserHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -157,13 +157,10 @@ func CreateUserHandler(c echo.Context) error {
 			http.StatusBadRequest,
 			ErrorRes{
 				Message: "Body da requisição inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
-
-	// Geração do Id
-	userId := uuid.New()
 
 	// Criptografia
 	hash, err := HashPassword(body.Password)
@@ -172,19 +169,23 @@ func CreateUserHandler(c echo.Context) error {
 			http.StatusInternalServerError,
 			ErrorRes{
 				Message: "Erro ao criptografar senha",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Criar usuário
-	err = db.CreateUser(ctx.DB, ctx.FileSystem, userId, body.Name, hash)
+	user := db.UserCreation{
+		Name:     body.Name,
+		Password: hash,
+	}
+	err = db.CreateUser(ctx, &user)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
 			ErrorRes{
 				Message: "Erro ao criar usuário",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -200,15 +201,15 @@ func CreateCategoryHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -219,7 +220,7 @@ func CreateCategoryHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Body da requisição inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -230,47 +231,23 @@ func CreateCategoryHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
-	// Geração do Id
-	categId := uuid.New()
-
-	// Criação do diretório
-	err = ctx.FileSystem.CreateCategory(userId, categId)
-	if err != nil {
-		return c.JSON(
-			http.StatusInternalServerError,
-			ErrorRes{
-				Message: "Erro ao criar diretório da categoria",
-				Error:   err,
-			},
-		)
+	// Criar categoria
+	categ := db.CategCreation{
+		UserId: userId,
+		Name:   body.Name,
 	}
-
-	// Agendar a exclusão do diretório em caso de erro subsequente
-	defer func() {
-		if err != nil {
-			err = ctx.FileSystem.DeleteCategory(userId, categId)
-			if err != nil {
-				ctx.Logger.Error(
-					"Erro ao limpar arquivo lixo",
-					zap.Error(err),
-				)
-			}
-		}
-	}()
-
-	// Criar categoria no banco
-	err = db.CreateCategory(ctx.DB, categId, userId, body.Name)
+	err = db.CreateCategory(ctx, &categ)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
 			ErrorRes{
 				Message: "Erro ao criar categoria",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -286,15 +263,15 @@ func CreateFileHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -305,7 +282,7 @@ func CreateFileHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Body da requisição inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -316,7 +293,7 @@ func CreateFileHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -326,65 +303,27 @@ func CreateFileHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
-
-	// Geração do Id
-	fileId := uuid.New()
-
-	// Criação do diretório
-	err = ctx.FileSystem.CreateFile(
-		userId,
-		categId,
-		fileId,
-		body.Extension,
-		&body.Content,
-	)
-	if err != nil {
-		return c.JSON(
-			http.StatusInternalServerError,
-			ErrorRes{
-				Message: "Erro ao criar arquivo",
-				Error:   err,
-			},
-		)
-	}
-
-	// Agendar a exclusão do diretório em caso de erro subsequente
-	defer func() {
-		if err != nil {
-			err = ctx.FileSystem.DeleteFile(
-				userId,
-				categId,
-				fileId,
-				body.Extension,
-			)
-			if err != nil {
-				ctx.Logger.Error(
-					"Erro ao limpar arquivo lixo",
-					zap.Error(err),
-				)
-			}
-		}
-	}()
 
 	// Criar categoria no banco
-	err = db.CreateFile(
-		ctx.DB,
-		fileId,
-		categId,
-		body.Name,
-		body.Extension,
-		body.Mimetype,
-	)
+	file := db.FileCreation{
+		UserId:    userId,
+		CategId:   categId,
+		Name:      body.Name,
+		Extension: body.Extension,
+		Mimetype:  body.Mimetype,
+		Content:   body.Content,
+	}
+	err = db.CreateFile(ctx, &file)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
 			ErrorRes{
 				Message: "Erro ao criar arquivo",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -404,25 +343,25 @@ func GetAllUsers(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllUsers(ctx.DB)
+	res, err := db.QueryAllUsers(ctx)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhum usuário foi obtido",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -435,15 +374,15 @@ func GetUserById(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -454,17 +393,17 @@ func GetUserById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryUserById(ctx.DB, userId)
+	res, err := db.QueryUserById(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não obtido",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -477,15 +416,15 @@ func GetAllCategories(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -496,17 +435,17 @@ func GetAllCategories(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllCategories(ctx.DB, userId)
+	res, err := db.QueryAllCategories(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhuma categoria foi obtida",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -519,15 +458,15 @@ func GetCategoryById(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -538,7 +477,7 @@ func GetCategoryById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -548,17 +487,17 @@ func GetCategoryById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryCategoryById(ctx.DB, categId)
+	res, err := db.QueryCategoryById(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não obtida",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -572,15 +511,15 @@ func GetAllFiles(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -591,7 +530,7 @@ func GetAllFiles(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -601,17 +540,17 @@ func GetAllFiles(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllFiles(ctx.DB, categId)
+	res, err := db.QueryAllFiles(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhum arquivo foi obtido",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -624,15 +563,15 @@ func GetFileById(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -643,7 +582,7 @@ func GetFileById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -653,7 +592,7 @@ func GetFileById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -663,17 +602,17 @@ func GetFileById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de arquivo inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryFileById(ctx.DB, fileId)
+	res, err := db.QueryFileById(ctx, fileId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Arquivo não obtido",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -690,37 +629,37 @@ func UpdateUserHandler(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[UpdateUserReq](c, ctx.Logger)
+	_, err := BodyUnmarshall[UpdateUserReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Body da requisição inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
 	// Parâmetros
-	userId, err := uuid.Parse(c.Param("userId"))
+	_, err = uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -732,40 +671,43 @@ func UpdateUserHandler(c echo.Context) error {
 
 // UpdateCategoryHandler gerencia a modificação de uma categoria pelo seu Id.
 func UpdateCategoryHandler(c echo.Context) error {
-	ctx := services.GetContext(c)
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
-	}
+	// Obtenção do contexto da aplicação
+	ctx := context.GetContext(c)
 
-	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[utils.NameInputReq](c, ctx.Logger)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest,
+	// Autenticação
+	if !auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
 			ErrorRes{
-				Message: "Body da requisição inválido",
-				Error:   err,
+				Message: "Usuário não autorizado",
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
-	params := fs.UpdateCategoryParams{
-		UserId:  uuid.MustParse(c.Param("userId")),
-		CategId: uuid.MustParse(c.Param("categId")),
-		Name:    body.Name,
+	// Ler o corpo da requisição
+	_, err := BodyUnmarshall[UpdateCategoryReq](c, ctx.Logger)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Body da requisição inválido",
+				Error:   err.Error(),
+			},
+		)
 	}
 
-	// Atualização
-	ctx.FileSystem.Mux.Lock()
-	err = ctx.FileSystem.FS.UpdateCategoryById(params)
-	defer ctx.FileSystem.Mux.Unlock()
-
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Parâmetros
+	_, err = uuid.Parse(c.Param("userId"))
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Categoria não encontrada",
-			Error:   err,
-		})
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err.Error(),
+			},
+		)
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -775,44 +717,43 @@ func UpdateCategoryHandler(c echo.Context) error {
 
 // UpdateFileHandler gerencia a modificação de um arquivo pelo seu Id.
 func UpdateFileHandler(c echo.Context) error {
-	ctx := services.GetContext(c)
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
-	}
+	// Obtenção do contexto da aplicação
+	ctx := context.GetContext(c)
 
-	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[FileInputReq](c, ctx.Logger)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest,
+	// Autenticação
+	if !auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
 			ErrorRes{
-				Message: "Body da requisição inválido",
-				Error:   err,
+				Message: "Usuário não autorizado",
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
-	params := fs.UpdateFileParams{
-		UserId:    uuid.MustParse(c.Param("userId")),
-		CategId:   uuid.MustParse(c.Param("categId")),
-		FileId:    uuid.MustParse(c.Param("fileId")),
-		Name:      body.Name,
-		FileType:  body.FileType,
-		Extension: body.Extension,
-		Content:   body.Content,
+	// Ler o corpo da requisição
+	_, err := BodyUnmarshall[UpdateFileReq](c, ctx.Logger)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Body da requisição inválido",
+				Error:   err.Error(),
+			},
+		)
 	}
 
-	// Atualização
-	ctx.FileSystem.Mux.Lock()
-	err = ctx.FileSystem.FS.UpdateFileById(params)
-	defer ctx.FileSystem.Mux.Unlock()
-
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Parâmetros
+	_, err = uuid.Parse(c.Param("userId"))
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Usuário não encontrado",
-			Error:   err,
-		})
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err.Error(),
+			},
+		)
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -830,15 +771,15 @@ func DeleteUser(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
@@ -849,18 +790,9 @@ func DeleteUser(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
-	}
-
-	// Remoção do diretório
-	err = ctx.FileSystem.DeleteUser(userId)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorRes{
-			Message: "Não foi possível excluir diretório do usuário",
-			Error:   err,
-		})
 	}
 
 	// Remoção do usuário
@@ -868,7 +800,7 @@ func DeleteUser(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não encontrado",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -884,26 +816,26 @@ func DeleteCategory(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
 	// Parâmetros
-	userId, err := uuid.Parse(c.Param("userId"))
+	_, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -913,7 +845,7 @@ func DeleteCategory(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -923,16 +855,7 @@ func DeleteCategory(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não encontrada",
-			Error:   err,
-		})
-	}
-
-	// Remoção do diretório
-	err = ctx.FileSystem.DeleteCategory(userId, categId)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorRes{
-			Message: "Não foi possível excluir diretório da categoria",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 
@@ -948,36 +871,36 @@ func DeleteFile(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Obtenção do contexto da aplicação
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// Autenticação
-	if auth.IsAuthenticated(c) {
+	if !auth.IsAuthenticated(c) {
 		return c.JSON(
 			http.StatusUnauthorized,
 			ErrorRes{
 				Message: "Usuário não autorizado",
-				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+				Error:   fmt.Sprintf("usuário não tem permissões para esta operação"),
 			},
 		)
 	}
 
 	// Parâmetros
-	userId, err := uuid.Parse(c.Param("userId"))
+	_, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de usuário inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
 
-	categId, err := uuid.Parse(c.Param("categId"))
+	_, err = uuid.Parse(c.Param("categId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de categoria inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
 	}
@@ -987,18 +910,9 @@ func DeleteFile(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
 				Message: "Id de arquivo inválido",
-				Error:   err,
+				Error:   err.Error(),
 			},
 		)
-	}
-
-	// Obtenção dos dados
-	file, err := db.QueryFileById(ctx.DB, fileId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Arquivo não obtido",
-			Error:   err,
-		})
 	}
 
 	// Remoção do arquivo
@@ -1006,21 +920,7 @@ func DeleteFile(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Arquivo não encontrado",
-			Error:   err,
-		})
-	}
-
-	// Remoção do arquivo em disco
-	err = ctx.FileSystem.DeleteFile(
-		userId,
-		categId,
-		fileId,
-		file.Extension,
-	)
-	if err != nil {
-		return c.JSON(http.StatusInternalServerError, ErrorRes{
-			Message: "Não foi possível excluir diretório da categoria",
-			Error:   err,
+			Error:   err.Error(),
 		})
 	}
 

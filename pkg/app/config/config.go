@@ -8,12 +8,28 @@ import (
 	"os"
 )
 
-// LoadConfig carrega as configurações do servidor.
+const (
+	CfgFile = "config.json"
+)
+
+// LoadConfig carrega as configurações da aplicação a partir de um arquivo JSON.
+//
+// A função abre o arquivo config.json, lê seu conteúdo, faz o unmarshalling
+// para a estrutura de configuração config.Config, e aplica validações básicas
+// no ambiente configurado (Config.Environment).
+//
+// Parâmetros:
+//
+// - logr: zap.Logger da aplicação para logging.
+//
+// Retorno:
+//
+// - *config.Config: Ponteiro para a estrutura de configuração carregada.
 func LoadConfig(logr *zap.Logger) *config.Config {
 	logr.Info("Carregando arquivo de configurações")
 
 	// Abertura do arquivo de configuração
-	file, err := os.Open("cfg.json")
+	file, err := os.Open(CfgFile)
 	if err != nil {
 		logr.Fatal("Não foi possível abrir arquivo de configuração",
 			zap.Error(err),

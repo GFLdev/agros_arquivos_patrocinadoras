@@ -7,7 +7,7 @@ type UserModel struct {
 	UpdatedAt int64  `json:"updated_at"`
 }
 
-type CategoryModel struct {
+type CategModel struct {
 	CategId   string `json:"categ_id"`
 	UserId    string `json:"user_id"`
 	Name      string `json:"name"`

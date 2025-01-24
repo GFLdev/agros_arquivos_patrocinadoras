@@ -1,7 +1,5 @@
 package config
 
-import "agros_arquivos_patrocinadoras/pkg/types/db"
-
 type Config struct {
 	Environment string   `json:"environment" validate:"required"`
 	Origins     []string `json:"origins" validate:"required"`
@@ -23,13 +21,36 @@ type Database struct {
 }
 
 type Schema struct {
-	Name       string                  `json:"name"`
-	UserTable  Table[db.UserModel]     `json:"user_table"`
-	CategTable Table[db.CategoryModel] `json:"categ_table"`
-	FileTable  Table[db.FileModel]     `json:"file_table"`
+	Name       string            `json:"name"`
+	UserTable  Table[UserTable]  `json:"user_table"`
+	CategTable Table[CategTable] `json:"categ_table"`
+	FileTable  Table[FileTable]  `json:"file_table"`
 }
 
 type Table[T interface{}] struct {
 	Name    string `json:"name"`
 	Columns T      `json:"columns"`
+}
+
+type UserTable struct {
+	UserId    string `json:"user_id"`
+	Name      string `json:"name"`
+	Password  string `json:"password"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type CategTable struct {
+	CategId   string `json:"categ_id"`
+	UserId    string `json:"user_id"`
+	Name      string `json:"name"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+type FileTable struct {
+	FileId    string `json:"file_id"`
+	CategId   string `json:"categ_id"`
+	Name      string `json:"name"`
+	Extension string `json:"extension"`
+	Mimetype  string `json:"mimetype"`
+	UpdatedAt string `json:"updated_at"`
 }

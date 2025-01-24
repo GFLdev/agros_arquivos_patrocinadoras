@@ -3,7 +3,6 @@ package fs
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"os"
 )
@@ -58,120 +57,44 @@ func (fs *FileSystem) CreateEntity(
 	return nil
 }
 
-// --------
-//   READ
-// --------
-
-// GetFile obtém o caminho de um arquivo com base em seu Id, sua categoria e
-// seu usuário, e verifica se o arquivo existe.
-func (fs *FileSystem) GetFile(
-	userId uuid.UUID,
-	categId uuid.UUID,
-	fileId uuid.UUID,
-	extension string,
-) (string, error) {
-	// Caminho
-	path := fmt.Sprintf(
-		"%s/user_%s/categ_%s/file_%s%s",
-		fs.Root,
-		userId.String(),
-		categId.String(),
-		fileId.String(),
-		extension,
-	)
-
-	// Verificar se arquivo existe
+// EntityExists verifica se um arquivo ou diretório existe no caminho
+// especificado.
+//
+// Parâmetros:
+//
+// - path: caminho do arquivo ou diretório a ser verificado.
+//
+// Retorno:
+//
+// - bool: retorna true se o arquivo ou diretório existir, ou false caso
+// contrário.
+func (fs *FileSystem) EntityExists(path string) bool {
 	_, err := os.Stat(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return "", fmt.Errorf("arquivo %s não existe", path)
+		return false
 	}
-
-	return path, nil
+	return true
 }
 
-// ----------
-//   UPDATE
-// ----------
+// TODO: Implementar UpdateEntity
 
-// UpdateCategory atualiza o caminho de uma categoria.
-func (fs *FileSystem) UpdateCategory(userId uuid.UUID, categId uuid.UUID) error {
-	return nil
+func (fs *FileSystem) UpdateEntity() error {
+	return fmt.Errorf("não implementado")
 }
 
-// UpdateFile atualiza o caminho de um arquivo.
-func (fs *FileSystem) UpdateFile(
-	userId uuid.UUID,
-	categId uuid.UUID,
-	fileId uuid.UUID,
-	extension string,
-) error {
-	return nil
-}
-
-// ----------
-//   DELETE
-// ----------
-
-// DeleteUser exclui o diretório do usuário com base em seu Id.
-func (fs *FileSystem) DeleteUser(userId uuid.UUID) error {
-	// Caminho
-	path := fmt.Sprintf("%s/user_%s", fs.Root, userId.String())
-
-	// Excluir diretório
-	err := DeleteFile(path)
+// DeleteEntity exclui o arquivo ou diretório no caminho especificado.
+//
+// Parâmetros:
+//
+// - path: caminho do arquivo ou diretório a ser excluído.
+//
+// Retorno:
+//
+// - error: retorna um erro caso a exclusão falhe, ou nil caso contrário.
+func (fs *FileSystem) DeleteEntity(path string) error {
+	err := os.Remove(path)
 	if err != nil {
-		return err
+		return fmt.Errorf("erro ao excluir %s: %v", path, err)
 	}
-
-	return nil
-}
-
-// DeleteCategory exclui o diretório da categoria com base em seu Id e de seu
-// respectivo usuário.
-func (fs *FileSystem) DeleteCategory(
-	userId uuid.UUID,
-	categId uuid.UUID,
-) error {
-	// Caminho
-	path := fmt.Sprintf(
-		"%s/user_%s/categ_%s",
-		fs.Root,
-		userId.String(),
-		categId.String(),
-	)
-
-	// Excluir diretório
-	err := DeleteFile(path)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// DeleteFile exclui um arquivo com base em seu Id e de seu respectivo usuário e
-// categoria, com sua extensão.
-func (fs *FileSystem) DeleteFile(
-	userId uuid.UUID,
-	categId uuid.UUID,
-	fileId uuid.UUID,
-	extension string,
-) error {
-	// Caminho
-	path := fmt.Sprintf(
-		"%s/user_%s/categ_%s/file_%s%s",
-		fs.Root,
-		userId.String(),
-		categId.String(),
-		fileId.String(),
-		extension,
-	)
-
-	// Excluir diretório
-	err := DeleteFile(path)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

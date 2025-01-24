@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -17,7 +17,7 @@ type CustomClaims struct {
 
 // GenerateToken gera token JWT.
 func GenerateToken(username string, c echo.Context) (string, error) {
-	ctx := services.GetContext(c)
+	ctx := context.GetContext(c)
 
 	// FIXME: Criar lógica de autenticação do usuário
 	userId := uuid.New()

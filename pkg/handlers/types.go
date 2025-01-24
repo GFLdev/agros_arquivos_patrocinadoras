@@ -51,7 +51,7 @@ type UpdateFileReq struct {
 
 type ErrorRes struct {
 	Message string `json:"message" validate:"required"`
-	Error   error  `json:"error" validate:"required"`
+	Error   string `json:"error" validate:"required"`
 }
 
 type GenericRes struct {

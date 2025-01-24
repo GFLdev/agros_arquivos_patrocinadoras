@@ -1,7 +1,7 @@
 package main
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/handlers"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -11,9 +11,9 @@ import (
 	"net/http"
 )
 
-// ContextMiddleware é o middleware para implementar services.AppWrapper como
+// ContextMiddleware é o middleware para implementar context.Context como
 // contexto padrão a ser usado por echo.Echo.
-func ContextMiddleware(ctx *services.AppWrapper) echo.MiddlewareFunc {
+func ContextMiddleware(ctx *context.Context) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			c.Set("appContext", ctx)
@@ -23,7 +23,7 @@ func ContextMiddleware(ctx *services.AppWrapper) echo.MiddlewareFunc {
 }
 
 // ConfigMiddleware configura os middlewares a serem utilizados pelo servidor.
-func ConfigMiddleware(e *echo.Echo, ctx *services.AppWrapper) {
+func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 	ctx.Logger.Info("Configurando middlewares")
 
 	corsConfig := middleware.CORSConfig{

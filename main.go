@@ -1,26 +1,27 @@
 package main
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services"
-	"agros_arquivos_patrocinadoras/filerepo/services/config"
-	"agros_arquivos_patrocinadoras/filerepo/services/fs"
-	"agros_arquivos_patrocinadoras/filerepo/services/logger"
+	"agros_arquivos_patrocinadoras/pkg/app/config"
+	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
+	"agros_arquivos_patrocinadoras/pkg/app/fs"
+	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"fmt"
-	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
-	"time"
+)
+
+const (
+	FsRoot = "data"
 )
 
 // Serve inicializa o servidor echo.
-func Serve(e *echo.Echo, ctx *services.AppWrapper) {
+func Serve(e *echo.Echo, ctx *context.Context) {
 	var err error
 	if ctx.Config.Environment == "production" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de produção na porta %d", ctx.Config.Port))
@@ -66,23 +67,6 @@ func handleSIGINT(c chan os.Signal, logr *zap.Logger) {
 func firstSetup(logr *zap.Logger) {
 	logr.Info("Configurando aplicação pela primeira vez")
 
-	// Criação da pasta com os arquivos, caso não exista
-	err := os.MkdirAll("repo", os.ModePerm)
-	if err != nil {
-		logr.Fatal("Erro ao criar diretório do repositório", zap.Error(err))
-	}
-
-	// Novo repositório de arquivos
-	newRepo := fs.FS{
-		Users:     map[uuid.UUID]fs.User{},
-		UpdatedAt: time.Now().Unix(),
-	}
-
-	// Escrita do arquivo de rastreamento dos arquivos
-	err = fs.StructToFile[fs.FS]("repo/track.json", &newRepo, logr)
-	if err != nil {
-		logr.Fatal("Erro na escrita de repo/track.json", zap.Error(err))
-	}
 }
 
 func init() {
@@ -92,14 +76,10 @@ func init() {
 		panic(err)
 	}
 
-	// Logger
-	logr := logger.CreateLogger()
-
-	// Caso não exista o arquivo de rastreamento dos arquivos, execute a
-	// primeira configuração da aplicação
-	_, err = os.Stat("repo/track.json")
-	if errors.Is(err, os.ErrNotExist) {
-		firstSetup(logr)
+	// Criação da pasta com os arquivos, caso não exista
+	err = os.MkdirAll(FsRoot, os.ModePerm)
+	if err != nil {
+		panic(err)
 	}
 }
 
@@ -113,18 +93,20 @@ func main() {
 	cfg := config.LoadConfig(logr)
 
 	// Sistema de arquivos
-	appFs, err := fs.GetFS(logr)
-	if err != nil {
-		logr.Fatal("Erro ao obter repositório de arquivos",
-			zap.Error(err),
-		)
+	filesystem := &fs.FileSystem{
+		Root: FsRoot,
 	}
 
 	// Banco de dados
-	dataBase := db.GetSqlDB(cfg.Database, logr)
+	dataBase := db.GetSqlDB(&cfg.Database, logr)
 
 	// Contexto da aplicação
-	ctx := services.NewAppWrapper(logr, cfg, appFs, dataBase)
+	ctx := &context.Context{
+		Logger:     logr,
+		Config:     cfg,
+		FileSystem: filesystem,
+		DB:         dataBase,
+	}
 
 	// Servidor Echo
 	e := echo.New()

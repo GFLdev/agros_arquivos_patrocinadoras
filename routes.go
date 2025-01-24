@@ -1,7 +1,7 @@
 package main
 
 import (
-	"agros_arquivos_patrocinadoras/filerepo/services"
+	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/handlers"
 	"github.com/labstack/echo/v4"
 )
@@ -17,7 +17,7 @@ import (
 //
 // As rotas de administradores incluem:
 // - GET, POST, PATCH e DELETE para usuários, categorias de arquivos e arquivos.
-func ConfigRoutes(e *echo.Echo, ctx *services.AppWrapper) {
+func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	ctx.Logger.Info("Configurando rotas")
 
 	// Login
