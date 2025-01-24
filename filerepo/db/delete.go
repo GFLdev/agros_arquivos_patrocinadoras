@@ -14,7 +14,7 @@ func DeleteUser(db *sql.DB, userId uuid.UUID) error {
 	}
 	defer tx.Rollback()
 
-	// Exclusão
+	// Exclusão em banco
 	del := `DELETE FROM patrocinadoras_repositorio
        WHERE uuid_patroc = $1`
 

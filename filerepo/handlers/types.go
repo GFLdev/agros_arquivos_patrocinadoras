@@ -1,5 +1,7 @@
 package handlers
 
+import "github.com/google/uuid"
+
 // ---------------
 //   Requisições
 // ---------------
@@ -23,6 +25,24 @@ type CreateFileReq struct {
 	Extension string `json:"extension" validate:"required"`
 	Mimetype  string `json:"mimetype" validate:"required"`
 	Content   []byte `json:"content" validate:"required"`
+}
+
+type UpdateUserReq struct {
+	Name     string `json:"name" validate:"required"`
+	Password string `json:"password" validate:"required"`
+}
+
+type UpdateCategoryReq struct {
+	UserId uuid.UUID `json:"userId" validate:"required"`
+	Name   string    `json:"name" validate:"required"`
+}
+
+type UpdateFileReq struct {
+	CategId   uuid.UUID `json:"categId" validate:"required"`
+	Name      string    `json:"name" validate:"required"`
+	Extension string    `json:"extension" validate:"required"`
+	Mimetype  string    `json:"mimetype" validate:"required"`
+	Content   []byte    `json:"content" validate:"required"`
 }
 
 // -------------

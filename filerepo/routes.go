@@ -25,24 +25,24 @@ func ConfigRoutes(e *echo.Echo, ctx *services.AppWrapper) {
 
 	// Usuário
 	e.POST("/user", handlers.CreateUserHandler)
-	e.GET("/user", handlers.AllUsersHandler)
-	e.GET("/user/:userId", handlers.UserByIdHandler)
+	e.GET("/user", handlers.GetAllUsers)
+	e.GET("/user/:userId", handlers.GetUserById)
 	e.PATCH("/user/:userId", handlers.UpdateUserHandler)
-	e.DELETE("/user/:userId", handlers.DeleteUserHandler)
+	e.DELETE("/user/:userId", handlers.DeleteUser)
 
 	// Categorias
 	e.POST("/user/:userId/category", handlers.CreateCategoryHandler)
-	e.GET("/user/:userId/category", handlers.AllCategoriesHandler)
-	e.GET("/user/:userId/category/:categId", handlers.CategoryByIdHandler)
+	e.GET("/user/:userId/category", handlers.GetAllCategories)
+	e.GET("/user/:userId/category/:categId", handlers.GetCategoryById)
 	e.PATCH("/user/:userId/category/:categId", handlers.UpdateCategoryHandler)
-	e.DELETE("/user/:userId/category/:categId", handlers.DeleteCategoryHandler)
+	e.DELETE("/user/:userId/category/:categId", handlers.DeleteCategory)
 
 	// Arquivos
 	e.POST("/user/:userId/category/:categId/file", handlers.CreateFileHandler)
-	e.GET("/user/:userId/category/:categId/file", handlers.AllFilesHandler)
-	e.GET("/user/:userId/category/:categId/file/:fileId", handlers.FileByIdHandler)
+	e.GET("/user/:userId/category/:categId/file", handlers.GetAllFiles)
+	e.GET("/user/:userId/category/:categId/file/:fileId", handlers.GetFileById)
 	e.PATCH("/user/:userId/category/:categId/file/:fileId", handlers.UpdateFileHandler)
-	e.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFileHandler)
+	e.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFile)
 
 	// Download
 	e.GET("/user/:userId/category/:categId/file/:fileId/download",

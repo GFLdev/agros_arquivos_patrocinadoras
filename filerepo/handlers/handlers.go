@@ -423,161 +423,285 @@ func CreateFileHandler(c echo.Context) error {
 //   READ
 // --------
 
-// AllUsersHandler obtém todos os usuários do repositório.
-func AllUsersHandler(c echo.Context) error {
+// GetAllUsers obtém todos os usuários do repositório.
+func GetAllUsers(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetAllUsers()
-	if !ok {
+	// Obtenção dos dados
+	res, err := db.QueryAllUsers(ctx.DB)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Nenhum usuário encontrado",
-			Error:   fmt.Errorf("repositório não tem nenhum usuário"),
+			Message: "Nenhum usuário foi obtido",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
-// UserByIdHandler obtém um usuário com base em seu ID.
-func UserByIdHandler(c echo.Context) error {
+// GetUserById obtém um usuário com base em seu Id.
+func GetUserById(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetUserById(userId)
-	if !ok {
+	// Obtenção dos dados
+	res, err := db.QueryUserById(ctx.DB, userId)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Usuário não encontrado",
-			Error:   fmt.Errorf("usuário %s não encontrado", userId.String()),
+			Message: "Usuário não obtido",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
-// AllCategoriesHandler obtém todas as categorias de um usuário do repositório.
-func AllCategoriesHandler(c echo.Context) error {
+// GetAllCategories obtém todas as categorias de um usuário do repositório.
+func GetAllCategories(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetAllCategories(userId)
-	if !ok {
+	// Obtenção dos dados
+	res, err := db.QueryAllCategories(ctx.DB, userId)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Nenhuma categoria encontrada",
-			Error:   fmt.Errorf("usuário %s não tem nenhuma categoria", userId.String()),
+			Message: "Nenhuma categoria foi obtida",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
-// CategoryByIdHandler obtém uma categoria com base em seu ID.
-func CategoryByIdHandler(c echo.Context) error {
+// GetCategoryById obtém uma categoria com base em seu Id.
+func GetCategoryById(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
+	// Parâmetros
+	_, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetCategoryById(userId, categId)
-	if !ok {
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	// Obtenção dos dados
+	res, err := db.QueryCategoryById(ctx.DB, categId)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Categoria não encontrada",
-			Error: fmt.Errorf("usuário %s não tem categoria %s",
-				userId.String(),
-				categId.String(),
-			),
+			Message: "Categoria não obtida",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
-// AllFilesHandler obtém todos os arquivos de uma categoria de um usuário do
+// GetAllFiles obtém todos os arquivos de uma categoria de um usuário do
 // repositório.
-func AllFilesHandler(c echo.Context) error {
+func GetAllFiles(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
+	// Parâmetros
+	_, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetAllFiles(userId, categId)
-	if !ok {
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	// Obtenção dos dados
+	res, err := db.QueryAllFiles(ctx.DB, categId)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Nenhum arquivo encontrado",
-			Error: fmt.Errorf("categoria %s de usuário %s não tem nenhum"+
-				" arquivo",
-				userId.String(),
-				categId.String(),
-			),
+			Message: "Nenhum arquivo foi obtido",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
-// FileByIdHandler obtém um arquivo com base em seu ID.
-func FileByIdHandler(c echo.Context) error {
+// GetFileById obtém um arquivo com base em seu Id.
+func GetFileById(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
-	fileId := uuid.MustParse(c.Param("fileId"))
+	// Parâmetros
+	_, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	ctx.FileSystem.Mux.Lock()
-	res, ok := ctx.FileSystem.FS.GetFileById(userId, categId, fileId)
-	if !ok {
+	_, err = uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	fileId, err := uuid.Parse(c.Param("fileId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de arquivo inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	// Obtenção dos dados
+	res, err := db.QueryFileById(ctx.DB, fileId)
+	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Arquivo não encontrado",
-			Error: fmt.Errorf("categoria %s de usuário %s não tem arquivo %s",
-				userId.String(),
-				categId.String(),
-				fileId.String(),
-			),
+			Message: "Arquivo não obtido",
+			Error:   err,
 		})
 	}
-	defer ctx.FileSystem.Mux.Unlock()
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 	return c.JSON(http.StatusOK, res)
 }
 
@@ -585,16 +709,27 @@ func FileByIdHandler(c echo.Context) error {
 //   UPDATE
 // ----------
 
-// UpdateUserHandler gerencia a modificação de um usuário pelo seu ID.
+// UpdateUserHandler gerencia a modificação de um usuário pelo seu Id.
 func UpdateUserHandler(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
 	// Ler o corpo da requisição
-	body, err := BodyUnmarshall[utils.NameInputReq](c, ctx.Logger)
+	body, err := BodyUnmarshall[UpdateUserReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -604,22 +739,15 @@ func UpdateUserHandler(c echo.Context) error {
 		)
 	}
 
-	params := fs.UpdateUserParams{
-		UserId: uuid.MustParse(c.Param("userId")),
-		Name:   body.Name,
-	}
-
-	// Atualização
-	ctx.FileSystem.Mux.Lock()
-	err = ctx.FileSystem.FS.UpdateUserById(params)
-	defer ctx.FileSystem.Mux.Unlock()
-
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Usuário não encontrado",
-			Error:   err,
-		})
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -627,7 +755,7 @@ func UpdateUserHandler(c echo.Context) error {
 	})
 }
 
-// UpdateCategoryHandler gerencia a modificação de uma categoria pelo seu ID.
+// UpdateCategoryHandler gerencia a modificação de uma categoria pelo seu Id.
 func UpdateCategoryHandler(c echo.Context) error {
 	ctx := services.GetContext(c)
 
@@ -670,7 +798,7 @@ func UpdateCategoryHandler(c echo.Context) error {
 	})
 }
 
-// UpdateFileHandler gerencia a modificação de um arquivo pelo seu ID.
+// UpdateFileHandler gerencia a modificação de um arquivo pelo seu Id.
 func UpdateFileHandler(c echo.Context) error {
 	ctx := services.GetContext(c)
 
@@ -721,22 +849,47 @@ func UpdateFileHandler(c echo.Context) error {
 //   DELETE
 // ----------
 
-// DeleteUserHandler gerencia a exclusão de um usuário pelo seu ID.
-func DeleteUserHandler(c echo.Context) error {
+// DeleteUser gerencia a exclusão de um usuário pelo seu Id.
+func DeleteUser(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	// Exclusão
-	ctx.FileSystem.Mux.Lock()
-	err := ctx.FileSystem.FS.DeleteUserById(userId)
-	defer ctx.FileSystem.Mux.Unlock()
+	// Remoção do diretório
+	err = ctx.FileSystem.DeleteUser(userId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorRes{
+			Message: "Não foi possível excluir diretório do usuário",
+			Error:   err,
+		})
+	}
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Remoção do usuário
+	err = db.DeleteUser(ctx.DB, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não encontrado",
@@ -744,28 +897,54 @@ func DeleteUserHandler(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
-		Message: "Usuário removido com sucesso",
-	})
+	return c.JSON(
+		http.StatusOK,
+		GenericRes{Message: "Usuário removido com sucesso"},
+	)
 }
 
-// DeleteCategoryHandler gerencia a exclusão de uma categoria pelo seu ID.
-func DeleteCategoryHandler(c echo.Context) error {
+// DeleteCategory gerencia a exclusão de uma categoria pelo seu Id.
+func DeleteCategory(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
 	ctx := services.GetContext(c)
 
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	// Exclusão
-	ctx.FileSystem.Mux.Lock()
-	err := ctx.FileSystem.FS.DeleteCategoryById(userId, categId)
-	defer ctx.FileSystem.Mux.Unlock()
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err,
+			},
+		)
+	}
 
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Remoção da categoria
+	err = db.DeleteCategory(ctx.DB, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não encontrada",
@@ -773,29 +952,82 @@ func DeleteCategoryHandler(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
-		Message: "Categoria removida com sucesso",
-	})
-}
-
-// DeleteFileHandler gerencia a exclusão de um arquivo pelo seu ID.
-func DeleteFileHandler(c echo.Context) error {
-	ctx := services.GetContext(c)
-
-	if err := auth.IsAuthenticated(c); err != nil {
-		return err
+	// Remoção do diretório
+	err = ctx.FileSystem.DeleteCategory(userId, categId)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorRes{
+			Message: "Não foi possível excluir diretório da categoria",
+			Error:   err,
+		})
 	}
 
-	userId := uuid.MustParse(c.Param("userId"))
-	categId := uuid.MustParse(c.Param("categId"))
-	fileId := uuid.MustParse(c.Param("fileId"))
+	return c.JSON(
+		http.StatusOK,
+		GenericRes{Message: "Categoria removida com sucesso"},
+	)
+}
 
-	// Exclusão
-	ctx.FileSystem.Mux.Lock()
-	err := ctx.FileSystem.FS.DeleteFileById(userId, categId, fileId)
-	defer ctx.FileSystem.Mux.Unlock()
-
+// DeleteFile gerencia a exclusão de um arquivo pelo seu Id.
+func DeleteFile(c echo.Context) error {
+	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
+	ctx := services.GetContext(c)
+
+	// Autenticação
+	if auth.IsAuthenticated(c) {
+		return c.JSON(
+			http.StatusUnauthorized,
+			ErrorRes{
+				Message: "Usuário não autorizado",
+				Error:   fmt.Errorf("usuário não tem permissões para esta operação"),
+			},
+		)
+	}
+
+	// Parâmetros
+	userId, err := uuid.Parse(c.Param("userId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de usuário inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	fileId, err := uuid.Parse(c.Param("fileId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de arquivo inválido",
+				Error:   err,
+			},
+		)
+	}
+
+	// Obtenção dos dados
+	file, err := db.QueryFileById(ctx.DB, fileId)
+	if err != nil {
+		return c.JSON(http.StatusNotFound, ErrorRes{
+			Message: "Arquivo não obtido",
+			Error:   err,
+		})
+	}
+
+	// Remoção do arquivo
+	err = db.DeleteFile(ctx.DB, fileId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Arquivo não encontrado",
@@ -803,7 +1035,22 @@ func DeleteFileHandler(c echo.Context) error {
 		})
 	}
 
-	return c.JSON(http.StatusOK, GenericRes{
-		Message: "Arquivo removido com sucesso",
-	})
+	// Remoção do arquivo em disco
+	err = ctx.FileSystem.DeleteFile(
+		userId,
+		categId,
+		fileId,
+		file.Extension,
+	)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, ErrorRes{
+			Message: "Não foi possível excluir diretório da categoria",
+			Error:   err,
+		})
+	}
+
+	return c.JSON(
+		http.StatusOK,
+		GenericRes{Message: "Arquivo removido com sucesso"},
+	)
 }
