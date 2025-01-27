@@ -64,11 +64,6 @@ func handleSIGINT(c chan os.Signal, logr *zap.Logger) {
 	}
 }
 
-func firstSetup(logr *zap.Logger) {
-	logr.Info("Configurando aplicação pela primeira vez")
-
-}
-
 func init() {
 	// Criação da pasta logs, caso não exista
 	err := os.MkdirAll("logs", os.ModePerm)

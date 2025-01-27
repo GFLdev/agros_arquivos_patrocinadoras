@@ -36,7 +36,7 @@ func WriteToFile(path string, data []byte, logr *zap.Logger) error {
 	defer func(file *os.File) {
 		err := file.Close()
 		if err != nil {
-			logr.Fatal("Erro ao fechar "+path, zap.Error(err))
+			logr.Error("Erro ao fechar "+path, zap.Error(err))
 		}
 	}(file)
 
@@ -45,7 +45,7 @@ func WriteToFile(path string, data []byte, logr *zap.Logger) error {
 	defer func(writer *bufio.Writer) {
 		err := writer.Flush()
 		if err != nil {
-			logr.Fatal("Erro ao liberar buffer de escrita", zap.Error(err))
+			logr.Error("Erro ao liberar buffer de escrita", zap.Error(err))
 		}
 	}(writer)
 

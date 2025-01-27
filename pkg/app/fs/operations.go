@@ -76,10 +76,25 @@ func (fs *FileSystem) EntityExists(path string) bool {
 	return true
 }
 
-// TODO: Implementar UpdateEntity
-
-func (fs *FileSystem) UpdateEntity() error {
-	return fmt.Errorf("não implementado")
+// UpdateEntity atualiza a localização de uma entidade no sistema de arquivos,
+// movendo-a do caminho antigo para um novo caminho especificado.
+//
+// Parâmetros:
+//
+// - oldPath: string representando o caminho atual da entidade.
+//
+// - newPath: string representando o novo caminho da entidade.
+//
+// Retorno:
+//
+// - error: retorna um erro caso a operação de renomear falhe. Inclui detalhes
+// sobre o caminho antigo, o novo caminho e a causa do erro.
+func (fs *FileSystem) UpdateEntity(oldPath, newPath string) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return fmt.Errorf("erro ao mover %s para %s: %v", oldPath, newPath, err)
+	}
+	return nil
 }
 
 // DeleteEntity exclui o arquivo ou diretório no caminho especificado.

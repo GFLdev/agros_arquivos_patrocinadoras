@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/app/db"
+	"agros_arquivos_patrocinadoras/pkg/app/store"
 	"agros_arquivos_patrocinadoras/pkg/auth"
 	"fmt"
 	"github.com/google/uuid"
@@ -92,7 +92,7 @@ func DownloadHandler(c echo.Context) error {
 	}
 
 	// Obtenção dos metadados do arquivo
-	file, err := db.QueryFileById(ctx, fileId)
+	file, err := store.QueryFileById(ctx, fileId)
 	if err != nil {
 		return c.JSON(
 			http.StatusNotFound,
@@ -175,11 +175,11 @@ func CreateUserHandler(c echo.Context) error {
 	}
 
 	// Criar usuário
-	user := db.UserCreation{
+	user := store.UserParams{
 		Name:     body.Name,
 		Password: hash,
 	}
-	err = db.CreateUser(ctx, &user)
+	err = store.CreateUser(ctx, &user)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
@@ -237,11 +237,11 @@ func CreateCategoryHandler(c echo.Context) error {
 	}
 
 	// Criar categoria
-	categ := db.CategCreation{
+	categ := store.CategParams{
 		UserId: userId,
 		Name:   body.Name,
 	}
-	err = db.CreateCategory(ctx, &categ)
+	err = store.CreateCategory(ctx, &categ)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
@@ -309,15 +309,15 @@ func CreateFileHandler(c echo.Context) error {
 	}
 
 	// Criar categoria no banco
-	file := db.FileCreation{
+	file := store.FileParams{
 		UserId:    userId,
 		CategId:   categId,
 		Name:      body.Name,
 		Extension: body.Extension,
 		Mimetype:  body.Mimetype,
-		Content:   body.Content,
+		Content:   &body.Content,
 	}
-	err = db.CreateFile(ctx, &file)
+	err = store.CreateFile(ctx, &file)
 	if err != nil {
 		return c.JSON(
 			http.StatusInternalServerError,
@@ -357,7 +357,7 @@ func GetAllUsers(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllUsers(ctx)
+	res, err := store.QueryAllUsers(ctx)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhum usuário foi obtido",
@@ -399,7 +399,7 @@ func GetUserById(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryUserById(ctx, userId)
+	res, err := store.QueryUserById(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Usuário não obtido",
@@ -441,7 +441,7 @@ func GetAllCategories(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllCategories(ctx, userId)
+	res, err := store.QueryAllCategories(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhuma categoria foi obtida",
@@ -493,7 +493,7 @@ func GetCategoryById(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryCategoryById(ctx, categId)
+	res, err := store.QueryCategoryById(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Categoria não obtida",
@@ -546,7 +546,7 @@ func GetAllFiles(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryAllFiles(ctx, categId)
+	res, err := store.QueryAllFiles(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Nenhum arquivo foi obtido",
@@ -608,7 +608,7 @@ func GetFileById(c echo.Context) error {
 	}
 
 	// Obtenção dos dados
-	res, err := db.QueryFileById(ctx, fileId)
+	res, err := store.QueryFileById(ctx, fileId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, ErrorRes{
 			Message: "Arquivo não obtido",
@@ -643,7 +643,7 @@ func UpdateUserHandler(c echo.Context) error {
 	}
 
 	// Ler o corpo da requisição
-	_, err := BodyUnmarshall[UpdateUserReq](c, ctx.Logger)
+	body, err := BodyUnmarshall[UpdateUserReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -654,7 +654,7 @@ func UpdateUserHandler(c echo.Context) error {
 	}
 
 	// Parâmetros
-	_, err = uuid.Parse(c.Param("userId"))
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -662,6 +662,46 @@ func UpdateUserHandler(c echo.Context) error {
 				Error:   err.Error(),
 			},
 		)
+	}
+
+	// Obter dados do usuário
+	data, err := store.QueryUserById(ctx, userId)
+	if err != nil {
+		return c.JSON(http.StatusNotFound,
+			ErrorRes{
+				Message: "Usuário não obtido",
+				Error:   err.Error(),
+			})
+	}
+
+	// Criptografia
+	hash, err := HashPassword(body.Password)
+	if err != nil {
+		return c.JSON(
+			http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao criptografar senha",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	// Alteração
+	user := store.UserUpdate{
+		UserId:  userId,
+		OldName: data.Name,
+		UserParams: store.UserParams{
+			Name:     body.Name,
+			Password: hash,
+		},
+	}
+	err = store.UpdateUser(ctx, user)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao atualizar usuário",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -689,7 +729,7 @@ func UpdateCategoryHandler(c echo.Context) error {
 	}
 
 	// Ler o corpo da requisição
-	_, err := BodyUnmarshall[UpdateCategoryReq](c, ctx.Logger)
+	body, err := BodyUnmarshall[UpdateCategoryReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -700,7 +740,7 @@ func UpdateCategoryHandler(c echo.Context) error {
 	}
 
 	// Parâmetros
-	_, err = uuid.Parse(c.Param("userId"))
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -708,6 +748,45 @@ func UpdateCategoryHandler(c echo.Context) error {
 				Error:   err.Error(),
 			},
 		)
+	}
+
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	// Obter dados do usuário
+	data, err := store.QueryCategoryById(ctx, categId)
+	if err != nil {
+		return c.JSON(http.StatusNotFound,
+			ErrorRes{
+				Message: "Usuário não obtido",
+				Error:   err.Error(),
+			})
+	}
+
+	// Alteração
+	categ := store.CategUpdate{
+		CategId:   categId,
+		OldUserId: userId,
+		OldName:   data.Name,
+		CategParams: store.CategParams{
+			UserId: body.UserId,
+			Name:   body.Name,
+		},
+	}
+	err = store.UpdateCategory(ctx, categ)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao atualizar usuário",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -735,7 +814,7 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	// Ler o corpo da requisição
-	_, err := BodyUnmarshall[UpdateFileReq](c, ctx.Logger)
+	body, err := BodyUnmarshall[UpdateFileReq](c, ctx.Logger)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -746,7 +825,7 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	// Parâmetros
-	_, err = uuid.Parse(c.Param("userId"))
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -754,6 +833,61 @@ func UpdateFileHandler(c echo.Context) error {
 				Error:   err.Error(),
 			},
 		)
+	}
+
+	categId, err := uuid.Parse(c.Param("categId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de categoria inválido",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	fileId, err := uuid.Parse(c.Param("fileId"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest,
+			ErrorRes{
+				Message: "Id de arquivo inválido",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	// Obter dados do usuário
+	data, err := store.QueryFileById(ctx, fileId)
+	if err != nil {
+		return c.JSON(http.StatusNotFound,
+			ErrorRes{
+				Message: "Usuário não obtido",
+				Error:   err.Error(),
+			})
+	}
+
+	// Alteração
+	file := store.FileUpdate{
+		FileId:       fileId,
+		OldCategId:   categId,
+		OldName:      data.Name,
+		OldExtension: data.Extension,
+		OldMimetype:  data.Mimetype,
+		FileParams: store.FileParams{
+			UserId:    userId,
+			CategId:   body.CategId,
+			Name:      body.Name,
+			Extension: body.Extension,
+			Mimetype:  body.Mimetype,
+			Content:   &body.Content,
+		},
+	}
+	err = store.UpdateFile(ctx, file)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao atualizar arquivo",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(http.StatusOK, GenericRes{
@@ -796,12 +930,14 @@ func DeleteUser(c echo.Context) error {
 	}
 
 	// Remoção do usuário
-	err = db.DeleteUser(ctx.DB, userId)
+	user := store.UserDelete{UserId: userId}
+	err = store.DeleteUser(ctx, user)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Usuário não encontrado",
-			Error:   err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao excluir usuário",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(
@@ -830,7 +966,7 @@ func DeleteCategory(c echo.Context) error {
 	}
 
 	// Parâmetros
-	_, err := uuid.Parse(c.Param("userId"))
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -851,12 +987,17 @@ func DeleteCategory(c echo.Context) error {
 	}
 
 	// Remoção da categoria
-	err = db.DeleteCategory(ctx.DB, categId)
+	categ := store.CategDelete{
+		UserId:  userId,
+		CategId: categId,
+	}
+	err = store.DeleteCategory(ctx, categ)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Categoria não encontrada",
-			Error:   err.Error(),
-		})
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao excluir categoria",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(
@@ -885,7 +1026,7 @@ func DeleteFile(c echo.Context) error {
 	}
 
 	// Parâmetros
-	_, err := uuid.Parse(c.Param("userId"))
+	userId, err := uuid.Parse(c.Param("userId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -895,7 +1036,7 @@ func DeleteFile(c echo.Context) error {
 		)
 	}
 
-	_, err = uuid.Parse(c.Param("categId"))
+	categId, err := uuid.Parse(c.Param("categId"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest,
 			ErrorRes{
@@ -915,13 +1056,32 @@ func DeleteFile(c echo.Context) error {
 		)
 	}
 
-	// Remoção do arquivo
-	err = db.DeleteFile(ctx.DB, fileId)
+	// Obter extensão do arquivo
+	data, err := store.QueryFileById(ctx, fileId)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, ErrorRes{
-			Message: "Arquivo não encontrado",
-			Error:   err.Error(),
-		})
+		return c.JSON(http.StatusNotFound,
+			ErrorRes{
+				Message: "Arquivo não obtido",
+				Error:   err.Error(),
+			})
+	}
+
+	// Remoção do arquivo
+	file := store.FileDelete{
+		CategDelete: store.CategDelete{
+			UserId:  userId,
+			CategId: categId,
+		},
+		FileId:    fileId,
+		Extension: data.Extension,
+	}
+	err = store.DeleteFile(ctx, file)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao excluir arquivo",
+				Error:   err.Error(),
+			})
 	}
 
 	return c.JSON(
