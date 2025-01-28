@@ -4,8 +4,8 @@ import "github.com/google/uuid"
 
 // LoginReq representa os dados necessários para autenticação de um usuário.
 type LoginReq struct {
-	// Username especifica o nome de usuário para autenticação.
-	Username string `json:"username" validate:"required"`
+	// Name especifica o nome de usuário para autenticação.
+	Name string `json:"name" validate:"required"`
 	// Password especifica a senha para autenticação.
 	Password string `json:"password" validate:"required"`
 }
@@ -85,4 +85,5 @@ type LoginRes struct {
 	Token string `json:"token" validate:"required"`
 	// Authenticated indica se o usuário foi autenticado com sucesso.
 	Authenticated bool `json:"authenticated" validate:"required"`
+	Admin         bool `json:"admin" validate:"required"`
 }

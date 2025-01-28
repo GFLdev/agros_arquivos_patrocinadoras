@@ -146,3 +146,8 @@ type FileDelete struct {
 	// Extension especifica a extensão do arquivo a ser excluído.
 	Extension string
 }
+
+type LoginCompare struct {
+	UserId uuid.UUID
+	Hash   string
+}

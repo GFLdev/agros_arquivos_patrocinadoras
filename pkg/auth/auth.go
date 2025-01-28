@@ -1,12 +1,47 @@
 package auth
 
 import (
+	"agros_arquivos_patrocinadoras/pkg/app/context"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"time"
 )
 
-func IsAuthenticated(c echo.Context) bool {
-	if false {
-		return false
+type CustomClaims struct {
+	Id    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Admin bool      `json:"admin"`
+	jwt.RegisteredClaims
+}
+
+// GenerateToken gera token JWT.
+func GenerateToken(c echo.Context, userId uuid.UUID, userName string) (string, error) {
+	ctx := context.GetContext(c)
+
+	// JWT Claims
+	duration := time.Duration(ctx.Config.JwtExpires)
+	claims := CustomClaims{
+		Id:    userId,
+		Name:  userName,
+		Admin: true,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(
+				time.Now().Add(duration * time.Minute),
+			),
+		},
 	}
-	return true
+
+	// Declaração do token com algoritmo HS256
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	// Gerar token criptografado
+	t, err := token.SignedString([]byte(ctx.Config.JwtSecret))
+	if err != nil {
+		ctx.Logger.Error("Erro ao gerar JWT.", zap.Error(err))
+		return "", err
+	}
+
+	return t, nil
 }

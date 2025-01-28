@@ -35,37 +35,32 @@ import (
 // encontrado.
 //
 // - error: retorna um erro se ocorrer falha na autenticação.
-func UserLogin(ctx *context.Context, p UserParams) (uuid.UUID, error) {
-	var userId uuid.UUID
+func UserLogin(ctx *context.Context, name string) (LoginCompare, error) {
+	login := LoginCompare{}
 
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s
+		`SELECT %s, %s
 		FROM %s.%s
-		WHERE %s = :name AND %s = :password`,
+		WHERE %s = :name`,
 		schema.UserTable.Columns.UserId,
+		schema.UserTable.Columns.Password,
 		schema.Name,
 		schema.UserTable.Name,
 		schema.UserTable.Columns.Name,
-		schema.UserTable.Columns.Password,
 	)
 
 	// Obtenção da linha
 	err := ctx.DB.QueryRow(
 		query,
-		sql.Named("name", p.Name),
-		sql.Named("password", p.Password),
-	).Scan(userId)
+		sql.Named("name", name),
+	).Scan(&login.UserId, &login.Hash)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf(
-			"não foi possível procurar usuário %s: %v",
-			p.Name,
-			err,
-		)
+		return login, fmt.Errorf("não foi possível procurar usuário %s: %v", name, err)
 	}
 
-	return userId, nil
+	return login, nil
 }
 
 // rollbackCreate realiza um rollback em caso de falha durante a criação de
@@ -130,6 +125,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	ts := time.Now().Unix()
 	userId, err := uuid.NewUUID()
 	if err != nil {
+		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
 		return fmt.Errorf("não foi possível criar UUID: %v", err)
 	}
 	path := filepath.Join(ctx.FileSystem.Root, userId.String())
@@ -138,6 +134,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível transação: %v", rbErrors.DB)
 	}
 
@@ -154,7 +151,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s)
-		VALUES (:user_id, :NAME, :password, :updated_at)`,
+		VALUES (:user_id, :name, :password, :updated_at)`,
 		schema.Name,
 		schema.UserTable.Name,
 		schema.UserTable.Columns.UserId,
@@ -172,18 +169,21 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 		sql.Named("updated_at", ts),
 	)
 	if rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao criar usuário.", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível criar usuário: %v", rbErrors.DB)
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.User)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
 		return rbErrors.FS
 	}
 
 	// Confirmar a transação no banco
 	rbErrors.DB = tx.Commit()
 	if rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível confirmar transação: %v", rbErrors.DB)
 	}
 
@@ -409,7 +409,7 @@ func closeRows(ctx *context.Context, rows *sql.Rows) {
 // Retorno:
 //
 // - []db.UserModel: uma lista de usuários recuperados do banco, contendo os
-// campos UserId, Name e UpdatedAt.
+// campos Id, Name e UpdatedAt.
 //
 // - error: um erro é retornado caso a consulta ou o processamento dos
 // resultados falhe.
@@ -471,7 +471,7 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 // Retorno:
 //
 // - []db.CategModel: uma lista de categorias contendo os campos CategId,
-// UserId, Name e UpdatedAt.
+// Id, Name e UpdatedAt.
 //
 // - error: um erro é retornado caso a consulta ou o processamento dos
 // resultados falhe.
@@ -603,7 +603,7 @@ func QueryAllFiles(
 // QueryUserById realiza uma consulta ao banco de dados para buscar um usuário
 // pelo ID.
 //
-// A função executa uma query SQL para recuperar os campos UserId, Name e
+// A função executa uma query SQL para recuperar os campos Id, Name e
 // UpdatedAt de um usuário específico, identificado pelo userId fornecido.
 //
 // Parâmetros:
@@ -655,7 +655,7 @@ func QueryUserById(
 // QueryCategoryById realiza uma consulta ao banco de dados para buscar uma
 // categoria pelo seu ID.
 //
-// A função executa uma query SQL para recuperar os campos CategId, UserId,
+// A função executa uma query SQL para recuperar os campos CategId, Id,
 // Name e UpdatedAt de uma categoria específica, identificada pelo categId
 // fornecido.
 //
@@ -892,7 +892,7 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 //
 // A função utiliza uma transação para garantir a atomicidade das operações,
 // tanto no banco de dados quanto no sistema de arquivos. Os parâmetros que
-// serão atualizados (como UserId ou Name) são verificados dinamicamente.
+// serão atualizados (como Id ou Name) são verificados dinamicamente.
 //
 // Parâmetros:
 //
@@ -1200,7 +1200,7 @@ func rollbackDelete(ctx *context.Context, rbData DeleteRollbackData) {
 // arquivos.
 //
 // A função é responsável por remover o registro do usuário identificado pelo
-// UserId no banco de dados, bem como excluir o diretório associado a esse
+// Id no banco de dados, bem como excluir o diretório associado a esse
 // usuário no sistema e arquivos. Em caso de falha, um rollback é realizado para
 // desfazer alterações.
 //
