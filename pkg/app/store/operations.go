@@ -15,6 +15,59 @@ import (
 	"time"
 )
 
+// UserLogin realiza a autenticação de um usuário no banco de dados.
+//
+// A função é responsável por buscar o registro do usuário no banco de dados
+// utilizando o nome e a senha fornecidos. Se o usuário for encontrado, o
+// seu ID é retornado. Caso contrário, um erro é retornado.
+//
+// Parâmetros:
+//
+// - ctx: contexto da aplicação, contendo informações de configuração e
+// banco de dados.
+//
+// - p: estrutura UserParams contendo as credenciais do usuário (nome e
+// senha).
+//
+// Retorno:
+//
+// - uuid.UUID: retorna o ID do usuário autenticado ou uuid.Nil se não
+// encontrado.
+//
+// - error: retorna um erro se ocorrer falha na autenticação.
+func UserLogin(ctx *context.Context, p UserParams) (uuid.UUID, error) {
+	var userId uuid.UUID
+
+	// Query
+	schema := &ctx.Config.Database.Schema
+	query := fmt.Sprintf(
+		`SELECT %s
+		FROM %s.%s
+		WHERE %s = :name AND %s = :password`,
+		schema.UserTable.Columns.UserId,
+		schema.Name,
+		schema.UserTable.Name,
+		schema.UserTable.Columns.Name,
+		schema.UserTable.Columns.Password,
+	)
+
+	// Obtenção da linha
+	err := ctx.DB.QueryRow(
+		query,
+		sql.Named("name", p.Name),
+		sql.Named("password", p.Password),
+	).Scan(userId)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf(
+			"não foi possível procurar usuário %s: %v",
+			p.Name,
+			err,
+		)
+	}
+
+	return userId, nil
+}
+
 // rollbackCreate realiza um rollback em caso de falha durante a criação de
 // uma entidade no banco de dados ou no sistema de arquivos.
 //
@@ -101,7 +154,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s)
-		VALUES (:user_id, :name, :password, :updated_at)`,
+		VALUES (:user_id, :NAME, :password, :updated_at)`,
 		schema.Name,
 		schema.UserTable.Name,
 		schema.UserTable.Columns.UserId,
@@ -189,7 +242,7 @@ func CreateCategory(ctx *context.Context, p *CategParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s)
-		VALUES (:categ_id, :user_id, :name, :updated_at)`,
+		VALUES (:categ_id, :user_id, :NAME, :updated_at)`,
 		schema.Name,
 		schema.CategTable.Name,
 		schema.CategTable.Columns.CategId,
@@ -279,7 +332,7 @@ func CreateFile(ctx *context.Context, p *FileParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s, %s, %s)
-		VALUES (:file_id, :categ_id, :name, :extension, :mimetype, :updated_at)`,
+		VALUES (:file_id, :categ_id, :NAME, :extension, :mimetype, :updated_at)`,
 		schema.Name,
 		schema.FileTable.Name,
 		schema.FileTable.Columns.FileId,
@@ -574,12 +627,11 @@ func QueryUserById(
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s,%s,%s,%s
+		`SELECT %s,%s,%s
 		FROM %s.%s
 		WHERE %s = :user_id`,
 		schema.UserTable.Columns.UserId,
 		schema.UserTable.Columns.Name,
-		schema.UserTable.Columns.Password,
 		schema.UserTable.Columns.UpdatedAt,
 		schema.Name,
 		schema.UserTable.Name,
@@ -590,12 +642,12 @@ func QueryUserById(
 	err := ctx.DB.QueryRow(query, sql.Named("user_id", userId.String())).Scan(
 		&user.UserId,
 		&user.Name,
-		&user.Password,
 		&user.UpdatedAt,
 	)
 	if err != nil {
 		return user, fmt.Errorf("não foi possível obter usuário %s: %s", userId, err)
 	}
+	user.Password = ""
 
 	return user, nil
 }

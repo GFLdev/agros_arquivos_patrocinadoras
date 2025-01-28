@@ -16,17 +16,18 @@ type CustomClaims struct {
 }
 
 // GenerateToken gera token JWT.
-func GenerateToken(username string, c echo.Context) (string, error) {
+func GenerateToken(
+	c echo.Context,
+	userId uuid.UUID,
+	userName string,
+) (string, error) {
 	ctx := context.GetContext(c)
-
-	// FIXME: Criar lógica de autenticação do usuário
-	userId := uuid.New()
 
 	// JWT Claims
 	duration := time.Duration(ctx.Config.JwtExpires)
 	claims := CustomClaims{
 		UserId:   userId,
-		Username: username,
+		Username: userName,
 		Admin:    true,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(

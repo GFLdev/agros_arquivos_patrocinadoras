@@ -29,9 +29,47 @@ func LoginHandler(c echo.Context) error {
 		)
 	}
 
-	// TODO: Criar lógica de login
+	// Criptografia
+	hash, err := HashPassword(body.Password)
+	if err != nil {
+		return c.JSON(
+			http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao criptografar senha",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	// Verificar credenciais
+	user := store.UserParams{
+		Name:     body.Username,
+		Password: hash,
+	}
+	userId, err := store.UserLogin(ctx, user)
+	if err != nil {
+		res := LoginRes{
+			Token:         "",
+			Authenticated: true,
+		}
+		return c.JSON(http.StatusUnauthorized, res)
+	}
+
+	// Gerar token
+	token, err := auth.GenerateToken(c, userId, body.Username)
+	if err != nil {
+		return c.JSON(
+			http.StatusInternalServerError,
+			ErrorRes{
+				Message: "Erro ao gerar JWT",
+				Error:   err.Error(),
+			},
+		)
+	}
+
+	// Resultado
 	res := LoginRes{
-		User:          body.Username,
+		Token:         token,
 		Authenticated: true,
 	}
 
