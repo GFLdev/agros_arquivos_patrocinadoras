@@ -7,6 +7,7 @@ package logger
 import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"os"
 	"strconv"
 	"time"
 )
@@ -16,6 +17,18 @@ import (
 // Retornos:
 //   - *zap.Logger: instância configurada do logger.
 func CreateLogger() *zap.Logger {
+	// Execução em teste
+	if os.Getenv("GO_TEST") != "" {
+		// Apenas mensagens Error ou superiores
+		config := zap.NewDevelopmentConfig()
+		if os.Getenv("LOG_LEVEL") == "error" {
+			config.Level = zap.NewAtomicLevelAt(zap.ErrorLevel)
+		} else {
+			config.Level = zap.NewAtomicLevelAt(zap.PanicLevel)
+		}
+		return zap.Must(config.Build())
+	}
+
 	// Configuração do encoder para produção
 	encoderConfig := zap.NewProductionEncoderConfig()
 	encoderConfig.TimeKey = "timestamp"
@@ -38,5 +51,6 @@ func CreateLogger() *zap.Logger {
 			"logs/runtime_" + ts + ".log",
 		},
 	}
+
 	return zap.Must(config.Build())
 }

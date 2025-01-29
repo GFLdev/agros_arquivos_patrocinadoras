@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"fmt"
 	"go.uber.org/zap"
+	"io"
 	"os"
 )
 
@@ -25,19 +26,17 @@ func WriteToFile(path string, data []byte) error {
 	if err != nil {
 		return fmt.Errorf("erro a abrir %s: %w", path, err)
 	}
-	defer func(file *os.File) {
-		if err := file.Close(); err != nil {
-			logr.Error("Erro ao fechar "+path, zap.Error(err))
-		}
-	}(file)
 
 	// Criação de um buffer de escrita
 	writer := bufio.NewWriter(file)
-	defer func(writer *bufio.Writer) {
+	defer func(file *os.File, writer *bufio.Writer) {
 		if err := writer.Flush(); err != nil {
 			logr.Error("Erro ao liberar buffer de escrita", zap.Error(err))
 		}
-	}(writer)
+		if err := file.Close(); err != nil {
+			logr.Error("Erro ao fechar "+path, zap.Error(err))
+		}
+	}(file, writer)
 
 	// Escrever todo o slice
 	for len(data) > 0 {
@@ -49,4 +48,37 @@ func WriteToFile(path string, data []byte) error {
 	}
 
 	return nil
+}
+
+// EntityIsEmpty verifica se um diretório no caminho especificado está vazio.
+//
+// Parâmetros:
+//   - path: caminho do diretório a ser verificado.
+//
+// Retorno:
+//   - bool: retorna true se o diretório estiver vazio ou false caso contrário.
+//   - error: retorna um erro caso ocorra algum problema durante a verificação.
+func EntityIsEmpty(path string) (bool, error) {
+	logr := logger.CreateLogger()
+
+	// Abrindo arquivo
+	file, err := os.Open(path)
+	if err != nil {
+		return false, err
+	}
+	defer func(file *os.File) {
+		if err = file.Close(); err != nil {
+			logr.Error("Erro ao fechar "+path, zap.Error(err))
+		}
+	}(file)
+
+	// Verificação
+	info, err := file.Stat()
+	if !info.IsDir() {
+		return true, nil
+	}
+	if _, err = file.Readdirnames(1); err == io.EOF {
+		return true, nil
+	}
+	return false, nil
 }

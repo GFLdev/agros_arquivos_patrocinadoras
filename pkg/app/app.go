@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 	"io"
 	"os"
 	"path/filepath"
@@ -32,9 +33,7 @@ import (
 //   - LoginCompare: estrutura contendo o ID do usuário e o hash da senha.
 //   - error: erro que pode ocorrer durante a busca, como falhas de query ou
 //     ausência de informações.
-func GetCredentials(ctx *context.Context, name string) (LoginCompare, error) {
-	login := LoginCompare{}
-
+func GetCredentials(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
@@ -49,14 +48,26 @@ func GetCredentials(ctx *context.Context, name string) (LoginCompare, error) {
 	)
 
 	// Obtenção da linha
-	err := ctx.DB.QueryRow(
-		query,
-		sql.Named("name", name),
-	).Scan(&login.UserId, &login.Hash)
+	rows, err := ctx.DB.Query(query, sql.Named("name", p.Name))
 	if err != nil {
-		return login, fmt.Errorf("não foi possível obter usuário %s", name)
+		return uuid.Nil, fmt.Errorf("não foi possível obter os usuários")
 	}
-	return login, nil
+	defer closeRows(ctx, rows)
+
+	// Iterar por cada uma das linhas
+	for rows.Next() {
+		l := LoginCompare{}
+		err = rows.Scan(&l.UserId, &l.Hash)
+		if err != nil {
+			continue
+		}
+		err = bcrypt.CompareHashAndPassword([]byte(l.Hash), []byte(p.Password))
+		if err == nil {
+			return l.UserId, nil
+		}
+	}
+
+	return uuid.Nil, fmt.Errorf("não autenticado")
 }
 
 // rollbackCreate realiza um rollback em caso de falha durante a criação de
@@ -96,10 +107,11 @@ func rollbackCreate(ctx *context.Context, rbData CreateRollbackData) {
 //     (ex: nome, senha).
 //
 // Retorno:
+//   - uuid.UUID: UUID do usuário criado.
 //   - error: retorna qualquer erro que possa ocorrer durante o processo de
 //     criação, como falhas na transação ou erros na interação com o sistema
 //     de arquivos.
-func CreateUser(ctx *context.Context, p UserParams) error {
+func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
@@ -107,7 +119,7 @@ func CreateUser(ctx *context.Context, p UserParams) error {
 	userId, err := uuid.NewUUID()
 	if err != nil {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
-		return fmt.Errorf("não foi possível criar UUID")
+		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(ctx.FileSystem.Root, userId.String())
 
@@ -116,7 +128,7 @@ func CreateUser(ctx *context.Context, p UserParams) error {
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -141,32 +153,38 @@ func CreateUser(ctx *context.Context, p UserParams) error {
 		schema.UserTable.Columns.UpdatedAt,
 	)
 
+	// Criptografar senha
+	hash, err := HashPassword(ctx, p.Password)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("não foi possível criptografar senha")
+	}
+
 	// Criação
 	_, rbErrors.DB = tx.Exec(
 		insert,
 		sql.Named("user_id", userId.String()),
 		sql.Named("name", p.Name),
-		sql.Named("password", p.Password),
+		sql.Named("password", hash),
 		sql.Named("updated_at", ts),
 	)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar usuário.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar usuário")
+		return uuid.Nil, fmt.Errorf("não foi possível criar usuário")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.User)
 	if rbErrors.FS != nil {
 		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
-		return rbErrors.FS
+		return uuid.Nil, rbErrors.FS
 	}
 
 	// Confirmar a transação no banco
 	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível confirmar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
-	return nil
+	return userId, nil
 }
 
 // CreateCategory cria um registro de uma nova categoria no banco de dados e
@@ -179,9 +197,10 @@ func CreateUser(ctx *context.Context, p UserParams) error {
 //     (ex: nome, identificador do usuário).
 //
 // Retorno:
+//   - uuid.UUID: UUID da categoria criada.
 //   - error: retorna um erro caso alguma etapa do processo falhe, como falhas
 //     na transação ou erros na criação do diretório.
-func CreateCategory(ctx *context.Context, p CategParams) error {
+func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
@@ -189,7 +208,7 @@ func CreateCategory(ctx *context.Context, p CategParams) error {
 	categId, err := uuid.NewUUID()
 	if err != nil {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
-		return fmt.Errorf("não foi possível criar UUID")
+		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(ctx.FileSystem.Root, p.UserId.String(), categId.String())
 
@@ -198,7 +217,7 @@ func CreateCategory(ctx *context.Context, p CategParams) error {
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -214,7 +233,7 @@ func CreateCategory(ctx *context.Context, p CategParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s)
-		VALUES (:categ_id, :user_id, :NAME, :updated_at)`,
+		VALUES (:categ_id, :user_id, :name, :updated_at)`,
 		schema.Name,
 		schema.CategTable.Name,
 		schema.CategTable.Columns.CategId,
@@ -233,33 +252,26 @@ func CreateCategory(ctx *context.Context, p CategParams) error {
 	)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar categoria.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar categoria")
+		return uuid.Nil, fmt.Errorf("não foi possível criar categoria")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.Category)
 	if rbErrors.FS != nil {
 		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
-		return rbErrors.FS
+		return uuid.Nil, rbErrors.FS
 	}
 
 	// Confirmar a transação no banco
 	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível confirmar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
-	return nil
+	return categId, nil
 }
 
 // CreateFile cria um registro de um novo arquivo no banco de dados e
 // configura um diretório correspondente no sistema de arquivos.
-//
-// A função executa as operações a seguir de maneira transacional:
-//   - Registro do arquivo no banco de dados.
-//   - Criação do arquivo no sistema de arquivos com o conteúdo fornecido.
-//
-// Em caso de falha em qualquer etapa, um rollback é executado para garantir que
-// nenhuma das operações parciais seja persistida.
 //
 // Parâmetros:
 //   - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
@@ -269,9 +281,10 @@ func CreateCategory(ctx *context.Context, p CategParams) error {
 //     usuário).
 //
 // Retorno:
+//   - uuid.UUID: UUID do arquivo criado.
 //   - error: retorna um erro caso alguma etapa do processo falhe, seja no banco
 //     de dados ou no sistema de arquivos.
-func CreateFile(ctx *context.Context, p FileParams) error {
+func CreateFile(ctx *context.Context, p FileParams) (uuid.UUID, error) {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
@@ -279,7 +292,7 @@ func CreateFile(ctx *context.Context, p FileParams) error {
 	fileId, err := uuid.NewUUID()
 	if err != nil {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
-		return fmt.Errorf("não foi possível criar UUID")
+		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(
 		ctx.FileSystem.Root,
@@ -293,7 +306,7 @@ func CreateFile(ctx *context.Context, p FileParams) error {
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -309,7 +322,7 @@ func CreateFile(ctx *context.Context, p FileParams) error {
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
   		(%s, %s, %s, %s, %s, %s)
-		VALUES (:file_id, :categ_id, :NAME, :extension, :mimetype, :updated_at)`,
+		VALUES (:file_id, :categ_id, :name, :extension, :mimetype, :updated_at)`,
 		schema.Name,
 		schema.FileTable.Name,
 		schema.FileTable.Columns.FileId,
@@ -332,22 +345,22 @@ func CreateFile(ctx *context.Context, p FileParams) error {
 	)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar arquivo.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar arquivo")
+		return uuid.Nil, fmt.Errorf("não foi possível criar arquivo")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, p.Content, fs.File)
 	if rbErrors.FS != nil {
 		ctx.Logger.Error("Erro ao criar arquivo em disco.", zap.Error(rbErrors.FS))
-		return rbErrors.FS
+		return uuid.Nil, rbErrors.FS
 	}
 
 	// Confirmar a transação
 	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível confirmar transação")
+		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
-	return nil
+	return fileId, nil
 }
 
 // closeRows fecha as linhas abertas de uma consulta SQL para liberar os

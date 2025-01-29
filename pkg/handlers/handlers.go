@@ -12,8 +12,8 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/auth"
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
-	"golang.org/x/crypto/bcrypt"
 	"net/http"
 )
 
@@ -37,17 +37,17 @@ func LoginHandler(c echo.Context) error {
 	}
 
 	// Verificar credenciais
-	userLogin, err := app.GetCredentials(ctx, body.Name)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusUnauthorized, UnauthorizedMessage)
+	user := app.UserParams{
+		Name:     body.Name,
+		Password: body.Password,
 	}
-	failed := bcrypt.CompareHashAndPassword([]byte(userLogin.Hash), []byte(body.Password))
-	if failed != nil {
+	userId, err := app.GetCredentials(ctx, user)
+	if err != nil || userId == uuid.Nil {
 		return echo.NewHTTPError(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
 	// Gerar token e resposta
-	token, err := auth.GenerateToken(c, userLogin.UserId, body.Name)
+	token, err := auth.GenerateToken(c, userId, body.Name)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
@@ -124,21 +124,15 @@ func CreateUserHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Criptografar senha
+	// Criptografar senha e criar usuário
 	if len(body.Password) < 4 {
 		return echo.NewHTTPError(http.StatusBadRequest, BadRequestMessage)
 	}
-	hash, err := HashPassword(ctx, body.Password)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
-	}
-
-	// Criar usuário
 	user := app.UserParams{
 		Name:     body.Name,
-		Password: hash,
+		Password: body.Password,
 	}
-	if err = app.CreateUser(ctx, user); err != nil {
+	if _, err = app.CreateUser(ctx, user); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, CreatedUserMessage)
@@ -175,7 +169,7 @@ func CreateCategoryHandler(c echo.Context) error {
 		UserId: userId,
 		Name:   body.Name,
 	}
-	if err = app.CreateCategory(ctx, categ); err != nil {
+	if _, err = app.CreateCategory(ctx, categ); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, CreatedCategoryMessage)
@@ -220,7 +214,7 @@ func CreateFileHandler(c echo.Context) error {
 		Mimetype:  body.Mimetype,
 		Content:   &body.Content,
 	}
-	if err = app.CreateFile(ctx, file); err != nil {
+	if _, err = app.CreateFile(ctx, file); err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, CreatedFileMessage)
@@ -430,22 +424,16 @@ func UpdateUserHandler(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, UserNotFoundMessage)
 	}
 
-	// Criptografar senha, se for passado valor
+	// Validar senha e alteração
 	if len(body.Password) < 4 {
 		return echo.NewHTTPError(http.StatusBadRequest, BadRequestMessage)
 	}
-	hash, err := HashPassword(ctx, body.Password)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, InternalServerErrorMessage)
-	}
-
-	// Alteração
 	user := app.UserUpdate{
 		UserId:  userId,
 		OldName: data.Name,
 		UserParams: app.UserParams{
 			Name:     body.Name,
-			Password: hash,
+			Password: body.Password,
 		},
 	}
 	if err = app.UpdateUser(ctx, user); err != nil {

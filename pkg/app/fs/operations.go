@@ -29,7 +29,7 @@ func (fs *FileSystem) CreateEntity(path string, content *[]byte, entity EntityTy
 			var entityName string
 			if entity == User {
 				entityName = "usuário"
-			} else if entity == Category {
+			} else {
 				entityName = "categoria"
 			}
 			return fmt.Errorf("erro ao criar pasta da %s: %w", entityName, err)
@@ -67,6 +67,14 @@ func (fs *FileSystem) EntityExists(path string) bool {
 //   - error: retorna um erro caso a operação de renomear falhe. Inclui detalhes
 //     sobre o caminho antigo, o novo caminho e a causa do erro.
 func (fs *FileSystem) UpdateEntity(oldPath, newPath string) error {
+	// Validação
+	if empty, err := EntityIsEmpty(oldPath); err != nil {
+		return err
+	} else if !empty {
+		return fmt.Errorf("diretório %s não vazio", oldPath)
+	}
+
+	// Atualização
 	if err := os.Rename(oldPath, newPath); err != nil {
 		return fmt.Errorf("erro ao mover %s para %s: %w", oldPath, newPath, err)
 	}
@@ -81,6 +89,14 @@ func (fs *FileSystem) UpdateEntity(oldPath, newPath string) error {
 // Retorno:
 //   - error: retorna um erro caso a exclusão falhe, ou nil caso contrário.
 func (fs *FileSystem) DeleteEntity(path string) error {
+	// Validação
+	if empty, err := EntityIsEmpty(path); err != nil {
+		return err
+	} else if !empty {
+		return fmt.Errorf("diretório %s não vazio", path)
+	}
+
+	// Exclusão
 	if err := os.Remove(path); err != nil {
 		return fmt.Errorf("erro ao excluir %s: %w", path, err)
 	}
