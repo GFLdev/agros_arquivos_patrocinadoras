@@ -1,45 +1,29 @@
 package fs
 
 import (
-	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"fmt"
 	"github.com/pkg/errors"
 	"os"
 )
 
 // CreateEntity cria uma entidade no sistema de arquivos.
-// Dependendo do tipo da entidade fornecida, pode criar:
-//
-// - Um arquivo: escreve o conteúdo especificado no caminho fornecido.
-//
-// - Um diretório: cria uma pasta para usuários ou categorias.
 //
 // Parâmetros:
-//
-// - path: caminho onde a entidade será criada.
-//
-// - content: conteúdo a ser escrito no arquivo (apenas para entidades do tipo
-// File). Pode ser nil para diretórios.
-//
-// - entity: tipo da entidade a ser criada (File, User ou Category).
+//   - path: caminho onde a entidade será criada.
+//   - content: conteúdo a ser escrito no arquivo (apenas para entidades do tipo
+//     File). Pode ser nil para diretórios.
+//   - entity: tipo da entidade a ser criada (File, User ou Category).
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrer falha na criação da entidade ou se o tipo
-// de entidade for inválido.
-func (fs *FileSystem) CreateEntity(
-	path string,
-	content *[]byte,
-	entity EntityType,
-) error {
-	logr := logger.CreateLogger()
-
+//   - error: retorna um erro se ocorrer falha na criação da entidade ou se o
+//     tipo de entidade for inválido.
+func (fs *FileSystem) CreateEntity(path string, content *[]byte, entity EntityType) error {
 	switch entity {
 	case File:
 		if content == nil {
 			return fmt.Errorf("conteúdo não pode ser nulo ao criar um arquivo")
 		}
-		return WriteToFile(path, *content, logr)
+		return WriteToFile(path, *content)
 	case User, Category:
 		if err := os.Mkdir(path, os.ModePerm); err != nil {
 			var entityName string
@@ -48,12 +32,11 @@ func (fs *FileSystem) CreateEntity(
 			} else if entity == Category {
 				entityName = "categoria"
 			}
-			return fmt.Errorf("erro ao criar pasta da %s: %v", entityName, err)
+			return fmt.Errorf("erro ao criar pasta da %s: %w", entityName, err)
 		}
 	default:
 		return fmt.Errorf("tipo de entidade inválido: %d", entity)
 	}
-
 	return nil
 }
 
@@ -61,16 +44,13 @@ func (fs *FileSystem) CreateEntity(
 // especificado.
 //
 // Parâmetros:
-//
-// - path: caminho do arquivo ou diretório a ser verificado.
+//   - path: caminho do arquivo ou diretório a ser verificado.
 //
 // Retorno:
-//
-// - bool: retorna true se o arquivo ou diretório existir, ou false caso
-// contrário.
+//   - bool: retorna true se o arquivo ou diretório existir, ou false caso
+//     contrário.
 func (fs *FileSystem) EntityExists(path string) bool {
-	_, err := os.Stat(path)
-	if errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
 		return false
 	}
 	return true
@@ -80,19 +60,15 @@ func (fs *FileSystem) EntityExists(path string) bool {
 // movendo-a do caminho antigo para um novo caminho especificado.
 //
 // Parâmetros:
-//
-// - oldPath: string representando o caminho atual da entidade.
-//
-// - newPath: string representando o novo caminho da entidade.
+//   - oldPath: string representando o caminho atual da entidade.
+//   - newPath: string representando o novo caminho da entidade.
 //
 // Retorno:
-//
-// - error: retorna um erro caso a operação de renomear falhe. Inclui detalhes
-// sobre o caminho antigo, o novo caminho e a causa do erro.
+//   - error: retorna um erro caso a operação de renomear falhe. Inclui detalhes
+//     sobre o caminho antigo, o novo caminho e a causa do erro.
 func (fs *FileSystem) UpdateEntity(oldPath, newPath string) error {
-	err := os.Rename(oldPath, newPath)
-	if err != nil {
-		return fmt.Errorf("erro ao mover %s para %s: %v", oldPath, newPath, err)
+	if err := os.Rename(oldPath, newPath); err != nil {
+		return fmt.Errorf("erro ao mover %s para %s: %w", oldPath, newPath, err)
 	}
 	return nil
 }
@@ -100,16 +76,13 @@ func (fs *FileSystem) UpdateEntity(oldPath, newPath string) error {
 // DeleteEntity exclui o arquivo ou diretório no caminho especificado.
 //
 // Parâmetros:
-//
-// - path: caminho do arquivo ou diretório a ser excluído.
+//   - path: caminho do arquivo ou diretório a ser excluído.
 //
 // Retorno:
-//
-// - error: retorna um erro caso a exclusão falhe, ou nil caso contrário.
+//   - error: retorna um erro caso a exclusão falhe, ou nil caso contrário.
 func (fs *FileSystem) DeleteEntity(path string) error {
-	err := os.Remove(path)
-	if err != nil {
-		return fmt.Errorf("erro ao excluir %s: %v", path, err)
+	if err := os.Remove(path); err != nil {
+		return fmt.Errorf("erro ao excluir %s: %w", path, err)
 	}
 	return nil
 }

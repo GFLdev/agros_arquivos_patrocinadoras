@@ -1,3 +1,6 @@
+// Package main implementa a aplicação principal responsável por inicializar e
+// configurar o servidor HTTP, gerenciar sinais do sistema e configurar
+// dependências como banco de dados, sistema de arquivos e logger.
 package main
 
 import (
@@ -16,16 +19,21 @@ import (
 	"syscall"
 )
 
-const (
-	FsRoot = "data"
-)
+// FsRoot define o nome do diretório raíz usado para operações no sistema de
+// arquivos.
+const FsRoot = "data"
 
-// Serve inicializa o servidor echo.
+// Serve é responsável por iniciar o servidor HTTP da aplicação.
+//
+// Parâmetros:
+//   - e: instância do servidor Echo para configurar e iniciar
+//     o serviço HTTP/HTTPS.
+//   - ctx: contexto da aplicação contendo configurações,
+//     logger e dependências essenciais.
 func Serve(e *echo.Echo, ctx *context.Context) {
 	var err error
 	if ctx.Config.Environment == "production" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de produção na porta %d", ctx.Config.Port))
-
 		err = e.StartAutoTLS(":" + strconv.Itoa(ctx.Config.Port))
 	} else if ctx.Config.Environment == "development" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de desenvolvimento na porta %d", ctx.Config.Port))
@@ -46,6 +54,14 @@ func Serve(e *echo.Echo, ctx *context.Context) {
 	}
 }
 
+// handleSIGINT é responsável por lidar com o sinal SIGINT (Ctrl+C) recebido
+// durante a execução da aplicação, permitindo que o usuário decida se deseja
+// finalizar ou continuar a execução.
+//
+// Parâmetros:
+//   - c: canal para capturar os sinais enviados ao processo.
+//   - logr: instância do logger usada para registrar informações e avisos
+//     durante o manuseio do sinal.
 func handleSIGINT(c chan os.Signal, logr *zap.Logger) {
 	for sig := range c {
 		if sig == syscall.SIGINT {
@@ -57,23 +73,20 @@ func handleSIGINT(c chan os.Signal, logr *zap.Logger) {
 			if err == nil && strings.ToUpper(i) == "S" {
 				logr.Info("Finalizando a aplicação")
 				os.Exit(0)
-			} else {
-				logr.Info("SIGINT interrompido")
 			}
+			logr.Info("SIGINT interrompido")
 		}
 	}
 }
 
 func init() {
 	// Criação da pasta logs, caso não exista
-	err := os.MkdirAll("logs", os.ModePerm)
-	if err != nil {
+	if err := os.MkdirAll("logs", os.ModePerm); err != nil {
 		panic(err)
 	}
 
 	// Criação da pasta com os arquivos, caso não exista
-	err = os.MkdirAll(FsRoot, os.ModePerm)
-	if err != nil {
+	if err := os.MkdirAll(FsRoot, os.ModePerm); err != nil {
 		panic(err)
 	}
 }

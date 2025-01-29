@@ -1,4 +1,4 @@
-package store
+package app
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/fs"
@@ -147,7 +147,11 @@ type FileDelete struct {
 	Extension string
 }
 
+// LoginCompare define os parâmetros necessários para realizar a comparação de
+// login de um usuário.
 type LoginCompare struct {
+	// UserId especifica o identificador do usuário.
 	UserId uuid.UUID
-	Hash   string
+	// Hash representa a senha criptografada associada ao usuário.
+	Hash string
 }

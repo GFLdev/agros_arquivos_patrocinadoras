@@ -1,4 +1,9 @@
-package store
+// Package app fornece funcionalidades essenciais para a aplicação, incluindo
+// operações relacionadas a gerenciamento de usuários, interações com o banco
+// de dados, manipulação de sistema de arquivos e controle de transações. Ele
+// centraliza os componentes principais utilizados em várias partes da
+// aplicação, promovendo reutilização de código e consistência nas operações.
+package app
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
@@ -15,27 +20,19 @@ import (
 	"time"
 )
 
-// UserLogin realiza a autenticação de um usuário no banco de dados.
-//
-// A função é responsável por buscar o registro do usuário no banco de dados
-// utilizando o nome e a senha fornecidos. Se o usuário for encontrado, o
-// seu ID é retornado. Caso contrário, um erro é retornado.
+// GetCredentials realiza a busca de informações de login de um usuário no banco
+// de dados com base em seu nome.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração e
-// banco de dados.
-//
-// - p: estrutura UserParams contendo as credenciais do usuário (nome e
-// senha).
+//   - ctx: contexto da aplicação contendo recursos necessários como o banco
+//     de dados e configurações.
+//   - name: string representando o nome do usuário a ser procurado.
 //
 // Retorno:
-//
-// - uuid.UUID: retorna o ID do usuário autenticado ou uuid.Nil se não
-// encontrado.
-//
-// - error: retorna um erro se ocorrer falha na autenticação.
-func UserLogin(ctx *context.Context, name string) (LoginCompare, error) {
+//   - LoginCompare: estrutura contendo o ID do usuário e o hash da senha.
+//   - error: erro que pode ocorrer durante a busca, como falhas de query ou
+//     ausência de informações.
+func GetCredentials(ctx *context.Context, name string) (LoginCompare, error) {
 	login := LoginCompare{}
 
 	// Query
@@ -57,31 +54,25 @@ func UserLogin(ctx *context.Context, name string) (LoginCompare, error) {
 		sql.Named("name", name),
 	).Scan(&login.UserId, &login.Hash)
 	if err != nil {
-		return login, fmt.Errorf("não foi possível procurar usuário %s: %v", name, err)
+		return login, fmt.Errorf("não foi possível obter usuário %s", name)
 	}
-
 	return login, nil
 }
 
 // rollbackCreate realiza um rollback em caso de falha durante a criação de
-// uma entidade no banco de dados ou no sistema de arquivos.
+// uma entidade no banco de dados e/ou no sistema de arquivos.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação contendo zap.Logger, configuração e recursos
-// compartilhados.
-//
-// - rbData: estrutura CreateRollbackData.
+//   - ctx: contexto da aplicação que contém recursos compartilhados como
+//     banco de dados, logger e sistema de arquivos.
+//   - rbData: estrutura CreateRollbackData contendo informações da transação,
+//     caminho no sistema de arquivos e captura de erros durante o rollback.
 func rollbackCreate(ctx *context.Context, rbData CreateRollbackData) {
 	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
 		// Tentativas de rollback no banco
 		if rbData.DB != nil {
-			err := rbData.Tx.Rollback()
-			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de rollback falhou",
-					zap.Error(err),
-				)
+			if err := rbData.Tx.Rollback(); err != nil {
+				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
 			}
 		}
 
@@ -89,36 +80,26 @@ func rollbackCreate(ctx *context.Context, rbData CreateRollbackData) {
 		if rbData.Path != "" && rbData.FS != nil {
 			err := ctx.FileSystem.DeleteEntity(rbData.Path)
 			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de limpeza falhou",
-					zap.Error(err),
-				)
+				ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
 			}
 		}
 	}
 }
 
-// CreateUser cria um novo usuário no banco de dados e um diretório associado no
-// sistema de arquivos.
-//
-// Este método executa uma transação que envolve a criação de um registro no
-// banco de dados e a criação de um diretório correspondente para o usuário no
-// sistema de arquivos. Em caso de falha, um rollback é executado para reverter
-// quaisquer alterações realizadas.
+// CreateUser cria um registro de um novo usuário no banco de dados e
+// configura um diretório correspondente no sistema de arquivos.
 //
 // Parâmetros:
-//
-// - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
-// configurações e sistema de arquivos.
-//
-// - p: estrutura UserParams contendo as informações do usuário a ser criado.
+//   - ctx: ponteiro para o contexto da aplicação, contendo recursos como o
+//     banco de dados, sistema de arquivos, e informações de configuração.
+//   - p: estrutura UserParams com os dados necessários para criar o usuário
+//     (ex: nome, senha).
 //
 // Retorno:
-//
-// - error: retorna um erro caso ocorra qualquer falha durante o processo de
-// criação, incluindo erros de transação no banco de dados ou no sistema de
-// arquivos.
-func CreateUser(ctx *context.Context, p *UserParams) error {
+//   - error: retorna qualquer erro que possa ocorrer durante o processo de
+//     criação, como falhas na transação ou erros na interação com o sistema
+//     de arquivos.
+func CreateUser(ctx *context.Context, p UserParams) error {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
@@ -126,7 +107,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	userId, err := uuid.NewUUID()
 	if err != nil {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
-		return fmt.Errorf("não foi possível criar UUID: %v", err)
+		return fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(ctx.FileSystem.Root, userId.String())
 
@@ -135,7 +116,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível transação: %v", rbErrors.DB)
+		return fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -170,7 +151,7 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao criar usuário.", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível criar usuário: %v", rbErrors.DB)
+		return fmt.Errorf("não foi possível criar usuário")
 	}
 
 	// Transação no sistema de arquivos
@@ -181,44 +162,34 @@ func CreateUser(ctx *context.Context, p *UserParams) error {
 	}
 
 	// Confirmar a transação no banco
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
-		return fmt.Errorf("não foi possível confirmar transação: %v", rbErrors.DB)
+		return fmt.Errorf("não foi possível confirmar transação")
 	}
-
 	return nil
 }
 
-// CreateCategory cria uma nova categoria associada a um usuário no banco de
-// dados e um diretório correspondente no sistema de arquivos.
-//
-// Este método executa uma transação que envolve a criação de um registro no
-// banco de dados para a categoria e a criação de um diretório no sistema de
-// arquivos. Em caso de falha, um rollback é executado para reverter quaisquer
-// alterações realizadas.
+// CreateCategory cria um registro de uma nova categoria no banco de dados e
+// configura um diretório correspondente no sistema de arquivos.
 //
 // Parâmetros:
-//
-// - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
-// configurações e sistema de arquivos.
-//
-// - p: estrutura CategParams contendo as informações da categoria a ser
-// criada.
+//   - ctx: ponteiro para o contexto da aplicação, contendo o banco de dados,
+//     sistema de arquivos e configurações.
+//   - p: estrutura CategParams com os dados necessários para criar a categoria
+//     (ex: nome, identificador do usuário).
 //
 // Retorno:
-//
-// - error: retorna um erro caso ocorra qualquer falha durante o processo de
-// criação, incluindo erros de transação no banco de dados ou no sistema de
-// arquivos.
-func CreateCategory(ctx *context.Context, p *CategParams) error {
+//   - error: retorna um erro caso alguma etapa do processo falhe, como falhas
+//     na transação ou erros na criação do diretório.
+func CreateCategory(ctx *context.Context, p CategParams) error {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	categId, err := uuid.NewUUID()
 	if err != nil {
-		return fmt.Errorf("não foi possível criar UUID: %v", err)
+		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
+		return fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(ctx.FileSystem.Root, p.UserId.String(), categId.String())
 
@@ -226,7 +197,8 @@ func CreateCategory(ctx *context.Context, p *CategParams) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -260,50 +232,54 @@ func CreateCategory(ctx *context.Context, p *CategParams) error {
 		sql.Named("updated_at", ts),
 	)
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível criar categoria: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar categoria.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível criar categoria")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.Category)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
 		return rbErrors.FS
 	}
 
 	// Confirmar a transação no banco
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível confirmar transação")
 	}
-
 	return nil
 }
 
-// CreateFile cria um novo registro de arquivo no banco de dados e um arquivo
-// correspondente no sistema de arquivos.
+// CreateFile cria um registro de um novo arquivo no banco de dados e
+// configura um diretório correspondente no sistema de arquivos.
 //
-// O método executa uma transação que envolve a criação de um registro no banco
-// de dados e a criação física de um arquivo. Em caso de erro, realiza um
-// rollback para desfazer alterações parciais.
+// A função executa as operações a seguir de maneira transacional:
+//   - Registro do arquivo no banco de dados.
+//   - Criação do arquivo no sistema de arquivos com o conteúdo fornecido.
+//
+// Em caso de falha em qualquer etapa, um rollback é executado para garantir que
+// nenhuma das operações parciais seja persistida.
 //
 // Parâmetros:
-//
-// - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
-// configurações e sistema de arquivos.
-//
-// - p: estrutura FileParams contendo as informações do arquivo a ser criado.
+//   - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
+//     sistema de arquivos e as configurações da aplicação.
+//   - p: estrutura FileParams que contém os dados necessários para a criação do
+//     arquivo (ex: nome, extensão, conteúdo, identificador da categoria e do
+//     usuário).
 //
 // Retorno:
-//
-// - error: retorna um erro caso ocorra falha durante o processo de criação no
-// banco de dados ou no sistema de arquivos.
-func CreateFile(ctx *context.Context, p *FileParams) error {
+//   - error: retorna um erro caso alguma etapa do processo falhe, seja no banco
+//     de dados ou no sistema de arquivos.
+func CreateFile(ctx *context.Context, p FileParams) error {
 	rbErrors := &RollbackErrors{}
 
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	fileId, err := uuid.NewUUID()
 	if err != nil {
-		return fmt.Errorf("não foi possível criar UUID: %v", err)
+		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
+		return fmt.Errorf("não foi possível criar UUID")
 	}
 	path := filepath.Join(
 		ctx.FileSystem.Root,
@@ -316,7 +292,8 @@ func CreateFile(ctx *context.Context, p *FileParams) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -354,65 +331,49 @@ func CreateFile(ctx *context.Context, p *FileParams) error {
 		sql.Named("updated_at", ts),
 	)
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível criar arquivo: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar arquivo.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível criar arquivo")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.CreateEntity(path, p.Content, fs.File)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao criar arquivo em disco.", zap.Error(rbErrors.FS))
 		return rbErrors.FS
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível confirmar transação")
 	}
-
 	return nil
 }
 
-// closeRows garante o fechamento de um ponteiro de linhas de resultado de uma
-// consulta SQL.
-//
-// Essa função é utilizada para evitar vazamento de recursos, garantindo que o
-// objeto sql.Rows seja fechado corretamente após o uso. Caso ocorra um erro
-// durante o fechamento, ele será registrado no zap.Logger.
+// closeRows fecha as linhas abertas de uma consulta SQL para liberar os
+// recursos no banco de dados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, usado para registrar logs de aviso em caso de
-// falha ao fechar as linhas.
-//
-// - rows: ponteiro para o objeto sql.Rows que será fechado.
+//   - ctx: o contexto da aplicação, contendo o Logger para registrar
+//     mensagens de advertência.
+//   - rows: ponteiro para o resultado da consulta SQL, que será fechado.
 func closeRows(ctx *context.Context, rows *sql.Rows) {
-	err := rows.Close()
-	if err != nil {
-		ctx.Logger.Warn(
-			"Erro ao fechar linhas da query",
-			zap.Error(err),
-		)
+	if err := rows.Close(); err != nil {
+		ctx.Logger.Warn("Erro ao fechar linhas da query", zap.Error(err))
 	}
 }
 
-// QueryAllUsers recupera todos os usuários do banco de dados.
-//
-// Esta função executa uma consulta SQL para buscar todos os registros da tabela
-// de usuários e os retorna como uma lista de modelos db.UserModel. As senhas
-// não são incluídas nos resultados por segurança.
+// QueryAllUsers recupera todos os usuários armazenados no banco de dados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo a configuração do banco de dados e o
-// zap.Logger.
+//   - ctx: o contexto da aplicação, contendo a configuração do banco de dados
+//     e o zap.Logger para registrar logs de advertência em caso de erro.
 //
 // Retorno:
-//
-// - []db.UserModel: uma lista de usuários recuperados do banco, contendo os
-// campos Id, Name e UpdatedAt.
-//
-// - error: um erro é retornado caso a consulta ou o processamento dos
-// resultados falhe.
+//   - []db.UserModel: uma lista de usuários contendo os campos UserId, Name e
+//     UpdatedAt.
+//   - error: um erro é retornado caso a query ou o processamento dos resultados
+//     falhe.
 func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 	var users []db.UserModel
 
@@ -430,55 +391,38 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 	// Obtenção das linhas
 	rows, err := ctx.DB.Query(query)
 	if err != nil {
-		return users, fmt.Errorf(
-			"não foi possível realizar query de todos os usuários: %s",
-			err,
-		)
+		return users, fmt.Errorf("não foi possível obter os usuários")
 	}
 	defer closeRows(ctx, rows)
 
 	// Iterar por cada uma das linhas
 	for rows.Next() {
 		u := db.UserModel{Password: ""}
-		err := rows.Scan(&u.UserId, &u.Name, &u.UpdatedAt)
+		err = rows.Scan(&u.UserId, &u.Name, &u.UpdatedAt)
 		if err != nil {
-			return users, fmt.Errorf(
-				"não foi possível obter todos os usuários: %v",
-				err,
-			)
+			ctx.Logger.Error("Erro ao obter usuário.", zap.Error(err))
+			return users, fmt.Errorf("não foi possível obter todos os usuários")
 		}
 		users = append(users, u)
 	}
-
 	return users, nil
 }
 
 // QueryAllCategories recupera todas as categorias associadas a um usuário
-// específico no banco de dados.
-//
-// Esta função executa uma consulta SQL para buscar todas as categorias
-// vinculadas ao userId fornecido e retorna os resultados como uma lista de
-// modelos db.CategModel.
+// específico do banco de dados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo a configuração do banco de dados e o
-// zap.Logger.
-//
-// - userId: identificador único do usuário cujas categorias devem ser
-// recuperadas.
+//   - ctx: contexto da aplicação, contendo a configuração do banco de dados
+//     e o zap.Logger.
+//   - userId: identificador único do usuário cujas categorias devem ser
+//     recuperadas.
 //
 // Retorno:
-//
-// - []db.CategModel: uma lista de categorias contendo os campos CategId,
-// Id, Name e UpdatedAt.
-//
-// - error: um erro é retornado caso a consulta ou o processamento dos
-// resultados falhe.
-func QueryAllCategories(
-	ctx *context.Context,
-	userId uuid.UUID,
-) ([]db.CategModel, error) {
+//   - []db.CategModel: uma lista de categorias contendo os campos CategId,
+//     UserId, Name e UpdatedAt.
+//   - error: um erro é retornado caso a consulta ou o processamento dos
+//     resultados falhe.
+func QueryAllCategories(ctx *context.Context, userId uuid.UUID) ([]db.CategModel, error) {
 	var categs []db.CategModel
 
 	// Query
@@ -499,55 +443,38 @@ func QueryAllCategories(
 	// Obtenção das linhas
 	rows, err := ctx.DB.Query(query, sql.Named("user_id", userId.String()))
 	if err != nil {
-		return categs, fmt.Errorf(
-			"não foi possível realizar query de todas as categorias: %s",
-			err,
-		)
+		return categs, fmt.Errorf("não foi possível obter as categorias")
 	}
 	defer closeRows(ctx, rows)
 
 	// Iterar por cada uma das linhas
 	for rows.Next() {
 		var c db.CategModel
-		err := rows.Scan(&c.CategId, &c.UserId, &c.Name, &c.UpdatedAt)
+		err = rows.Scan(&c.CategId, &c.UserId, &c.Name, &c.UpdatedAt)
 		if err != nil {
-			return categs, fmt.Errorf(
-				"não foi possível obter todas as categorias: %v",
-				err,
-			)
+			ctx.Logger.Error("Erro ao obter categoria.", zap.Error(err))
+			return categs, fmt.Errorf("não foi possível obter todas as categorias")
 		}
 		categs = append(categs, c)
 	}
-
 	return categs, nil
 }
 
 // QueryAllFiles recupera todos os arquivos associados a uma categoria
-// específica no banco de dados.
-//
-// Esta função executa uma consulta SQL para buscar todos os arquivos vinculados
-// ao categId fornecido e retorna os resultados como uma lista de modelos
-// db.FileModel.
+// específica do banco de dados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo a configuração do banco de dados e o
-// zap.Logger.
-//
-// - categId: identificador único da categoria cujos arquivos devem ser
-// recuperados.
+//   - ctx: contexto da aplicação, contendo a configuração do banco de dados
+//     e o zap.Logger.
+//   - categId: identificador único da categoria cujos arquivos devem ser
+//     recuperados.
 //
 // Retorno:
-//
-// - []db.FileModel: uma lista de arquivos contendo os campos FileId, CategId,
-// Name, Extension, Mimetype e UpdatedAt.
-//
-// - error: um erro é retornado caso a consulta ou o processamento dos
-// resultados falhe.
-func QueryAllFiles(
-	ctx *context.Context,
-	categId uuid.UUID,
-) ([]db.FileModel, error) {
+//   - []db.FileModel: uma lista de arquivos contendo os campos FileId,
+//     CategId, Name, Extension, Mimetype e UpdatedAt.
+//   - error: um erro é retornado caso a consulta ou o processamento dos
+//     resultados falhe.
+func QueryAllFiles(ctx *context.Context, categId uuid.UUID) ([]db.FileModel, error) {
 	var files []db.FileModel
 
 	// Query
@@ -570,17 +497,14 @@ func QueryAllFiles(
 	// Obtenção das linhas
 	rows, err := ctx.DB.Query(query, sql.Named("categ_id", categId.String()))
 	if err != nil {
-		return files, fmt.Errorf(
-			"não foi possível realizar query de todos os arquivos: %s",
-			err,
-		)
+		return files, fmt.Errorf("não foi possível obter os arquivos")
 	}
 	defer closeRows(ctx, rows)
 
 	// Iterar por cada uma das linhas
 	for rows.Next() {
 		var f db.FileModel
-		err := rows.Scan(
+		err = rows.Scan(
 			&f.FileId,
 			&f.CategId,
 			&f.Name,
@@ -589,10 +513,8 @@ func QueryAllFiles(
 			&f.UpdatedAt,
 		)
 		if err != nil {
-			return files, fmt.Errorf(
-				"não foi possível obter todas os arquivos: %v",
-				err,
-			)
+			ctx.Logger.Error("Erro ao obter arquivo.", zap.Error(err))
+			return files, fmt.Errorf("não foi possível obter todas os arquivos")
 		}
 		files = append(files, f)
 	}
@@ -600,28 +522,19 @@ func QueryAllFiles(
 	return files, nil
 }
 
-// QueryUserById realiza uma consulta ao banco de dados para buscar um usuário
-// pelo ID.
-//
-// A função executa uma query SQL para recuperar os campos Id, Name e
-// UpdatedAt de um usuário específico, identificado pelo userId fornecido.
+// QueryUserById realiza uma consulta ao banco de dados para buscar um
+// usuário pelo seu ID.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração e banco de
-// dados.
-//
-// - userId: o uuid.UUID do usuário a ser consultado.
+//   - ctx: contexto da aplicação contendo configurações e acesso ao banco
+//     de dados.
+//   - userId: o uuid.UUID do usuário a ser buscado.
 //
 // Retorno:
-//
-// - db.UserModel: estrutura contendo os dados do usuário encontrado.
-//
-// - error: se ocorrer algum erro durante a consulta, um erro é retornado.
-func QueryUserById(
-	ctx *context.Context,
-	userId uuid.UUID,
-) (db.UserModel, error) {
+//   - db.UserModel: estrutura contendo os dados do usuário encontrado.
+//   - error: retorna um erro caso a execução da consulta ou o
+//     processamento do resultado falhe.
+func QueryUserById(ctx *context.Context, userId uuid.UUID) (db.UserModel, error) {
 	var user db.UserModel
 
 	// Query
@@ -639,42 +552,28 @@ func QueryUserById(
 	)
 
 	// Obtenção da linha
-	err := ctx.DB.QueryRow(query, sql.Named("user_id", userId.String())).Scan(
-		&user.UserId,
-		&user.Name,
-		&user.UpdatedAt,
-	)
+	row := ctx.DB.QueryRow(query, sql.Named("user_id", userId.String()))
+	err := row.Scan(&user.UserId, &user.Name, &user.UpdatedAt)
 	if err != nil {
-		return user, fmt.Errorf("não foi possível obter usuário %s: %s", userId, err)
+		return user, fmt.Errorf("não foi possível obter usuário")
 	}
 	user.Password = ""
-
 	return user, nil
 }
 
 // QueryCategoryById realiza uma consulta ao banco de dados para buscar uma
 // categoria pelo seu ID.
 //
-// A função executa uma query SQL para recuperar os campos CategId, Id,
-// Name e UpdatedAt de uma categoria específica, identificada pelo categId
-// fornecido.
-//
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração e banco de
-// dados.
-//
-// - categId: o uuid.UUID da categoria a ser consultada.
+//   - ctx: contexto da aplicação, contendo informações de configuração e
+//     acesso ao banco de dados.
+//   - categId: o uuid.UUID da categoria a ser buscada.
 //
 // Retorno:
-//
-// - db.CategModel: estrutura contendo os dados da categoria encontrada.
-//
-// - error: se ocorrer algum erro durante a consulta, um erro é retornado.
-func QueryCategoryById(
-	ctx *context.Context,
-	categId uuid.UUID,
-) (db.CategModel, error) {
+//   - db.CategModel: estrutura contendo os dados da categoria encontrada.
+//   - error: retorna um erro caso ocorra falha na execução da consulta ou no
+//     processamento do resultado.
+func QueryCategoryById(ctx *context.Context, categId uuid.UUID) (db.CategModel, error) {
 	var categ db.CategModel
 
 	// Query
@@ -693,42 +592,27 @@ func QueryCategoryById(
 	)
 
 	// Obtenção da linha
-	err := ctx.DB.QueryRow(query, sql.Named("categ_id", categId.String())).Scan(
-		&categ.CategId,
-		&categ.UserId,
-		&categ.Name,
-		&categ.UpdatedAt,
-	)
+	row := ctx.DB.QueryRow(query, sql.Named("categ_id", categId.String()))
+	err := row.Scan(&categ.CategId, &categ.UserId, &categ.Name, &categ.UpdatedAt)
 	if err != nil {
-		return categ, fmt.Errorf("não foi possível obter categoria %s: %s", categId, err)
+		return categ, fmt.Errorf("não foi possível obter categoria")
 	}
-
 	return categ, nil
 }
 
 // QueryFileById realiza uma consulta ao banco de dados para buscar um arquivo
 // pelo seu ID.
 //
-// A função executa uma query SQL para recuperar os campos FileId, CategId,
-// Name, Extension, Mimetype e UpdatedAt de um arquivo específico, identificado
-// pelo fileId fornecido.
-//
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração e banco de
-// dados.
-//
-// - fileId: o uuid.UUID do arquivo a ser consultado.
+//   - ctx: contexto da aplicação contendo informações de configuração e acesso
+//     ao banco de dados.
+//   - fileId: o uuid.UUID do arquivo a ser buscado.
 //
 // Retorno:
-//
-// - db.FileModel: estrutura contendo os dados do arquivo encontrado.
-//
-// - error: se ocorrer algum erro durante a consulta, um erro é retornado.
-func QueryFileById(
-	ctx *context.Context,
-	fileId uuid.UUID,
-) (db.FileModel, error) {
+//   - db.FileModel: estrutura contendo os dados do arquivo encontrado.
+//   - error: retorna um erro caso ocorra falha na execução da consulta ou no
+//     processamento do resultado.
+func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error) {
 	var file db.FileModel
 
 	// Query
@@ -749,7 +633,8 @@ func QueryFileById(
 	)
 
 	// Obtenção da linha
-	err := ctx.DB.QueryRow(query, sql.Named("file_id", fileId.String())).Scan(
+	row := ctx.DB.QueryRow(query, sql.Named("file_id", fileId.String()))
+	err := row.Scan(
 		&file.FileId,
 		&file.CategId,
 		&file.Name,
@@ -758,31 +643,25 @@ func QueryFileById(
 		&file.UpdatedAt,
 	)
 	if err != nil {
-		return file, fmt.Errorf("não foi possível obter arquivo %s: %s", fileId, err)
+		return file, fmt.Errorf("não foi possível obter arquivo")
 	}
-
 	return file, nil
 }
 
-// rollbackUpdate realiza um rollback em caso de falha durante a atualização
-// de uma entidade no banco de dados ou no sistema de arquivos.
+// rollbackUpdate tenta reverter uma atualização em caso de falha, restaurando o
+// estado anterior no banco de dados e no sistema de arquivos, caso necessário.
 //
 // Parâmetros:
-//
-//   - ctx: contexto da aplicação contendo zap.Logger, configuração e recursos
-//     compartilhados.
-//
-//   - rbData: estrutura UpdateRollbackData.
+//   - ctx: contexto da aplicação, contendo configurações, conexão ao banco de
+//     dados e utilitários de log.
+//   - rbData: estrutura UpdateRollbackData com informações da transação a ser
+//     revertida, caminhos de arquivos (se aplicável) e erros de rollback.
 func rollbackUpdate(ctx *context.Context, rbData UpdateRollbackData) {
 	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
 		// Tentativas de rollback no banco
 		if rbData.DB != nil {
-			err := rbData.Tx.Rollback()
-			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de rollback falhou",
-					zap.Error(err),
-				)
+			if err := rbData.Tx.Rollback(); err != nil {
+				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
 			}
 		}
 
@@ -791,47 +670,39 @@ func rollbackUpdate(ctx *context.Context, rbData UpdateRollbackData) {
 		if rbData.OldPath != "" && rbData.NewPath != "" && rbData.FS != nil {
 			err := ctx.FileSystem.UpdateEntity(rbData.NewPath, rbData.OldPath)
 			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de rollback falhou",
-					zap.Error(err),
-				)
+				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
 			}
 		}
 	}
 }
 
-// UpdateUser atualiza os dados de um usuário no banco de dados.
-//
-// A função utiliza uma transação para garantir que as alterações sejam
-// aplicadas de forma atômica. Apenas os campos fornecidos em p (como Name
-// ou Password) serão atualizados, juntamente com o campo UpdatedAt que é
-// automaticamente gerado com o timestamp atual.
+// UpdateUser atualiza os dados de um usuário no banco e, opcionalmente, no
+// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
+// parâmetros inseridos são alterados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração, logger
-// e conexão com o banco de dados.
-//
-// - p: estrutura do tipo UserUpdate contendo os dados a serem atualizados
-// para o usuário. Campos vazios em p serão ignorados.
+//   - ctx: contexto da aplicação contendo configurações, conexão com o banco de
+//     dados e utilitários para log.
+//   - p: estrutura UserUpdate com os detalhes do usuário a ser atualizado,
+//     incluindo IDs, nomes (atual e novo), senha, entre outros.
 //
 // Retorno:
-//
-// - error: se ocorrer algum erro durante o processo de atualização, incluindo
-// erros ao iniciar ou confirmar a transação, ou ao executar a query de
-// atualização.
+//   - error: retorna um erro caso ocorra falha em qualquer etapa do processo,
+//     seja na inicialização ou confirmação da transação, ou na atualização no
+//     banco de dados.
 func UpdateUser(ctx *context.Context, p UserUpdate) error {
 	rbErrors := &RollbackErrors{}
-
-	// Geração do Timestamp
-	ts := time.Now().Unix()
 
 	// Iniciar uma transação
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
 	}
+
+	// Geração do Timestamp
+	ts := time.Now().Unix()
 
 	// Agendar rollback em caso de erro
 	rbData := UpdateRollbackData{
@@ -872,44 +743,46 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(update, args)
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível atualizar usuário: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível atualizar usuário")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
-
 	return nil
 }
 
-// UpdateCategory atualiza os dados de uma categoria no banco de dados e realiza
-// alterações correspondentes no sistema de arquivos, se necessário.
-//
-// A função utiliza uma transação para garantir a atomicidade das operações,
-// tanto no banco de dados quanto no sistema de arquivos. Os parâmetros que
-// serão atualizados (como Id ou Name) são verificados dinamicamente.
+// UpdateCategory atualiza os dados de uma categoria no banco e, opcionalmente, no
+// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
+// parâmetros inseridos são alterados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração,
-// zap.logger, conexão com o banco de dados e o sistema de arquivos.
-//
-// - p: estrutura do tipo CategUpdate contendo os dados da categoria a serem
-// atualizados. Inclui o ID do usuário atual, o novo ID do usuário (se for
-// alterado), e o nome da categoria atual e novo.
+//   - ctx: contexto da aplicação contendo configurações, conexão com o banco de
+//     dados, utilitários de log e acesso ao sistema de arquivos.
+//   - p: estrutura CategUpdate com informações da categoria a ser atualizada,
+//     incluindo IDs, nomes (atual e novo) e usuários.
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrerem falhas em qualquer etapa do processo,
-// como falha ao iniciar ou confirmar a transação, ou erro ao atualizar o
-// sistema de arquivos.
+//   - error: retorna um erro caso ocorra falha em qualquer etapa, seja na
+//     inicialização ou confirmação da transação, execução da alteração no banco
+//     de dados ou atualização no sistema de arquivos.
 func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	rbErrors := &RollbackErrors{}
+
+	// Iniciar uma transação
+	var tx *sql.Tx
+	tx, rbErrors.DB = ctx.DB.Begin()
+	if rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
+	}
 
 	// Geração do Timestamp e caminhos
 	ts := time.Now().Unix()
@@ -946,13 +819,6 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	args = append(args, sql.Named("updated_at", ts))
 	set = append(set, schema.CategTable.Columns.UpdatedAt+" = :updated_at")
 
-	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
-	}
-
 	// Agendar rollback em caso de erro
 	rbData := UpdateRollbackData{
 		Tx:             tx,
@@ -977,9 +843,11 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(update, args)
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível atualizar categoria: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível atualizar categoria")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
@@ -992,38 +860,36 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
-
 	return nil
 }
 
-// UpdateFile atualiza os dados de um arquivo no banco de dados e realiza
-// alterações correspondentes no sistema de arquivos, se necessário.
-//
-// A função utiliza uma transação para garantir a atomicidade das operações,
-// tanto no banco de dados quanto no sistema de arquivos. Os parâmetros que
-// serão atualizados (como CategId, Name, Extension ou Mimetype) são verificados
-// dinamicamente.
+// UpdateFile atualiza os dados de um arquivo no banco e, opcionalmente, no
+// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
+// parâmetros inseridos são alterados.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração,
-// zap.logger, conexão com o banco de dados e o sistema de arquivos.
-//
-// - p: estrutura do tipo FileUpdate contendo os dados do arquivo a serem
-// atualizados. Inclui IDs do usuário e da categoria, nome atual e novo,
-// extensão, mimetype e conteúdo, se aplicável.
+//   - ctx: contexto da aplicação, contendo configurações, conexão com o banco,
+//     sistema de arquivos e utilitários.
+//   - p: estrutura FileUpdate com os dados do arquivo a ser atualizado,
+//     incluindo ID, categoria, nome, extensão, mime type, entre outros.
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrerem falhas em qualquer etapa do processo,
-// como falha ao iniciar ou confirmar a transação, ou erro ao atualizar o
-// sistema de arquivos.
+//   - error: retorna erro se ocorrer falha durante a transação ou ao aplicar
+//     mudanças no banco, ou no sistema de arquivos.
 func UpdateFile(ctx *context.Context, p FileUpdate) error {
 	rbErrors := &RollbackErrors{}
+
+	// Iniciar uma transação
+	var tx *sql.Tx
+	tx, rbErrors.DB = ctx.DB.Begin()
+	if rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
+	}
 
 	// Geração do Timestamp e caminhos
 	ts := time.Now().Unix()
@@ -1072,13 +938,6 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 	args = append(args, sql.Named("updated_at", ts))
 	set = append(set, schema.CategTable.Columns.UpdatedAt+" = :updated_at")
 
-	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
-	}
-
 	// Agendar rollback em caso de erro
 	rbData := UpdateRollbackData{
 		Tx:             tx,
@@ -1103,9 +962,11 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(update, args)
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível atualizar arquivo: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível atualizar arquivo")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
@@ -1145,37 +1006,27 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
-
 	return nil
 }
 
-// rollbackDelete realiza o rollback de uma operação de exclusão no banco de
-// dados e/ou no sistema de arquivos.
-//
-// A função é chamada para desfazer alterações realizadas durante uma operação
-// de exclusão, em caso de falha. Ela tenta reverter mudanças no banco de dados
-// e recriar arquivos no sistema de arquivos com base nos dados fornecidos.
+// rollbackDelete realiza o rollback de uma transação de exclusão no banco de
+// dados e no sistema de arquivos.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração, banco de
-// dados e sistema de arquivos.
-//
-// - rbData: estrutura DeleteRollbackData.
+//   - ctx: contexto da aplicação, contendo informações de configuração, banco
+//     de dados e sistema de arquivos.
+//   - rbData: estrutura DeleteRollbackData com os dados necessários para
+//     executar o rollback, como a transação, caminho do arquivo e erros.
 func rollbackDelete(ctx *context.Context, rbData DeleteRollbackData) {
 	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
 		// Tentativas de rollback no banco
 		if rbData.DB != nil {
-			err := rbData.Tx.Rollback()
-			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de rollback falhou",
-					zap.Error(err),
-				)
+			if err := rbData.Tx.Rollback(); err != nil {
+				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
 			}
 		}
 
@@ -1187,10 +1038,7 @@ func rollbackDelete(ctx *context.Context, rbData DeleteRollbackData) {
 				rbData.Type,
 			)
 			if err != nil {
-				ctx.Logger.Error(
-					"Tentativa de rollback falhou",
-					zap.Error(err),
-				)
+				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
 			}
 		}
 	}
@@ -1199,22 +1047,14 @@ func rollbackDelete(ctx *context.Context, rbData DeleteRollbackData) {
 // DeleteUser realiza a exclusão de um usuário no banco de dados e no sistema de
 // arquivos.
 //
-// A função é responsável por remover o registro do usuário identificado pelo
-// Id no banco de dados, bem como excluir o diretório associado a esse
-// usuário no sistema e arquivos. Em caso de falha, um rollback é realizado para
-// desfazer alterações.
-//
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração, banco de
-// dados e sistema de arquivos.
-//
-// - p: estrutura UserDelete.
+//   - ctx: contexto da aplicação, contendo informações de configuração, banco de
+//     dados e sistema de arquivos.
+//   - p: estrutura UserDelete que contém as informações do usuário a ser excluído.
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrer alguma falha durante o processo de
-// exclusão.
+//   - error: retorna um erro se ocorrer alguma falha durante o processo de
+//     exclusão.
 func DeleteUser(ctx *context.Context, p UserDelete) error {
 	rbErrors := &RollbackErrors{}
 
@@ -1225,7 +1065,8 @@ func DeleteUser(ctx *context.Context, p UserDelete) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -1251,46 +1092,39 @@ func DeleteUser(ctx *context.Context, p UserDelete) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(del, sql.Named("user_id", p.UserId.String()))
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível excluir usuário: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível excluir usuário")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao excluir diretório.", zap.Error(rbErrors.DB))
 		return rbErrors.FS
 	}
-
 	return nil
 }
 
 // DeleteCategory realiza a exclusão de uma categoria no banco de dados e no
 // sistema de arquivos.
 //
-// A função é responsável por remover o registro da categoria identificado pelo
-// CategId no banco de dados, bem como excluir o diretório associado a essa
-// categoria no sistema de arquivos. Em caso de falha, um rollback é realizado
-// para desfazer alterações.
-//
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração, banco de
-// dados e sistema de arquivos.
-//
-// - p: estrutura CategDelete.
+//   - ctx: contexto da aplicação, contendo configurações, banco de dados e
+//     sistema de arquivos.
+//   - p: estrutura CategDelete com os dados necessários para a exclusão.
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrer alguma falha durante o processo de
-// exclusão.
+//   - error: retorna um erro se ocorrer falha durante o processo de exclusão.
 func DeleteCategory(ctx *context.Context, p CategDelete) error {
 	rbErrors := &RollbackErrors{}
 
@@ -1305,7 +1139,8 @@ func DeleteCategory(ctx *context.Context, p CategDelete) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -1331,47 +1166,39 @@ func DeleteCategory(ctx *context.Context, p CategDelete) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(del, sql.Named("categ_id", p.CategId.String()))
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível excluir categoria: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível excluir categoria")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao excluir diretório.", zap.Error(rbErrors.DB))
 		return rbErrors.FS
 	}
-
 	return nil
 }
 
-// DeleteFile realiza a exclusão de um arquivo no banco de dados e no sistema de
-// arquivos.
-//
-// A função é responsável por remover o registro do arquivo identificado pelo
-// FileId no banco de dados, bem como excluir o arquivo associado no sistema de
-// arquivos. Antes de excluir o arquivo, seu conteúdo é lido e armazenado como
-// backup para uso em caso de rollback. Em caso de falha, um rollback é
-// realizado para desfazer alterações.
+// DeleteFile realiza a exclusão de um arquivo no banco de dados e no sistema
+// de arquivos.
 //
 // Parâmetros:
-//
-// - ctx: contexto da aplicação, contendo informações de configuração, banco de
-// dados e sistema de arquivos.
-//
-// - p: estrutura FileDelete, contendo os dados necessários para exclusão.
+//   - ctx: contexto da aplicação, contendo configurações, banco de dados e
+//     sistema de arquivos.
+//   - p: estrutura FileDelete com os dados necessários para a exclusão.
 //
 // Retorno:
-//
-// - error: retorna um erro se ocorrer alguma falha durante o processo de
-// exclusão.
+//   - error: retorna um erro se ocorrer falha durante o processo de exclusão.
 func DeleteFile(ctx *context.Context, p FileDelete) error {
 	rbErrors := &RollbackErrors{}
 
@@ -1387,23 +1214,21 @@ func DeleteFile(ctx *context.Context, p FileDelete) error {
 	// Abrir arquivo
 	file, err := os.Open(path)
 	if err != nil {
-		rbErrors.FS = fmt.Errorf("erro ao abrir %s: %v", path, err)
+		ctx.Logger.Error("Erro ao abrir arquivo.", zap.Error(err))
+		rbErrors.FS = fmt.Errorf("erro ao abrir %s", path)
 		return rbErrors.FS
 	}
 	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			ctx.Logger.Error(
-				"Erro ao fechar arquivo para leitura",
-				zap.Error(err),
-			)
+		if err := file.Close(); err != nil {
+			ctx.Logger.Error("Erro ao fechar arquivo para leitura", zap.Error(err))
 		}
 	}(file)
 	// Leitura
 	var backupContent []byte
 	backupContent, rbErrors.FS = io.ReadAll(file)
 	if rbErrors.FS != nil {
-		rbErrors.FS = fmt.Errorf("erro ao ler %s para backup: %v", path, rbErrors.FS)
+		ctx.Logger.Error("Erro ao ler arquivo.", zap.Error(rbErrors.FS))
+		rbErrors.FS = fmt.Errorf("erro ao ler %s para backup", path)
 		return rbErrors.FS
 	}
 
@@ -1411,7 +1236,8 @@ func DeleteFile(ctx *context.Context, p FileDelete) error {
 	var tx *sql.Tx
 	tx, rbErrors.DB = ctx.DB.Begin()
 	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao iniciar transação: %v", rbErrors.DB)
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
@@ -1437,21 +1263,24 @@ func DeleteFile(ctx *context.Context, p FileDelete) error {
 	var res sql.Result
 	res, rbErrors.DB = tx.Exec(del, sql.Named("file_id", p.FileId.String()))
 	if rbErrors.DB != nil {
-		return fmt.Errorf("não foi possível excluir arquivo: %s", rbErrors.DB)
+		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(rbErrors.DB))
+		return fmt.Errorf("não foi possível excluir arquivo")
 	} else if n, _ := res.RowsAffected(); n > 1 {
 		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(rbErrors.DB))
 		return rbErrors.DB
 	}
 
 	// Confirmar a transação
-	rbErrors.DB = tx.Commit()
-	if rbErrors.DB != nil {
-		return fmt.Errorf("erro ao confirmar transação: %v", rbErrors.DB)
+	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+		return fmt.Errorf("erro ao confirmar transação")
 	}
 
 	// Transação no sistema de arquivos
 	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
 	if rbErrors.FS != nil {
+		ctx.Logger.Error("Erro ao excluir arquivo em disco.", zap.Error(rbErrors.DB))
 		return rbErrors.FS
 	}
 

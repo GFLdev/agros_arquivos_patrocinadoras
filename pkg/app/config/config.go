@@ -1,3 +1,10 @@
+// Package config fornece funcionalidades para carregar e gerenciar configurações
+// da aplicação a partir de um arquivo JSON. Ele inclui métodos para lidar com a
+// leitura, desagrupamento e validação de dados de configuração, garantindo que o
+// ambiente da aplicação seja configurado corretamente.
+//
+// Este pacote foi projetado para usar o logger zap para fornecer informações
+// detalhadas sobre falhas e erros relacionados às configurações.
 package config
 
 import (
@@ -8,57 +15,39 @@ import (
 	"os"
 )
 
-const (
-	CfgFile = "config.json"
-)
+// CfgFile é o nome padrão do arquivo de configuração JSON da aplicação.
+const CfgFile = "config.json"
 
-// LoadConfig carrega as configurações da aplicação a partir de um arquivo JSON.
-//
-// A função abre o arquivo config.json, lê seu conteúdo, faz o unmarshalling
-// para a estrutura de configuração config.Config, e aplica validações básicas
-// no ambiente configurado (Config.Environment).
+// LoadConfig lê e carrega as configurações da aplicação a partir de um arquivo
+// JSON padrão.
 //
 // Parâmetros:
-//
-// - logr: zap.Logger da aplicação para logging.
+//   - logr: zap.Logger da aplicação para logging.
 //
 // Retorno:
-//
-// - *config.Config: Ponteiro para a estrutura de configuração carregada.
+//   - *config.Config: ponteiro para a estrutura de configuração carregada.
 func LoadConfig(logr *zap.Logger) *config.Config {
 	logr.Info("Carregando arquivo de configurações")
 
 	// Abertura do arquivo de configuração
 	file, err := os.Open(CfgFile)
 	if err != nil {
-		logr.Fatal("Não foi possível abrir arquivo de configuração",
-			zap.Error(err),
-		)
+		logr.Fatal("Não foi possível abrir arquivo de configuração", zap.Error(err))
 	}
 	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			logr.Fatal("Não foi possível fechar arquivo de configuração",
-				zap.Error(err),
-			)
+		if err := file.Close(); err != nil {
+			logr.Fatal("Não foi possível fechar arquivo de configuração", zap.Error(err))
 		}
 	}(file)
 
-	// Leitura do arquivo
+	// Leitura do arquivo e desagrupamento do JSON
 	jsonPayload, err := io.ReadAll(file)
 	if err != nil {
-		logr.Fatal("Não foi possível ler arquivo de configuração",
-			zap.Error(err),
-		)
+		logr.Fatal("Não foi possível ler arquivo de configuração", zap.Error(err))
 	}
-
-	// Desagrupamento do JSON
 	cfg := &config.Config{}
-	err = json.Unmarshal(jsonPayload, cfg)
-	if err != nil {
-		logr.Fatal("Não foi possível desagrupar dados de configuração",
-			zap.Error(err),
-		)
+	if err = json.Unmarshal(jsonPayload, cfg); err != nil {
+		logr.Fatal("Não foi possível desagrupar dados de configuração", zap.Error(err))
 	}
 
 	// Logging

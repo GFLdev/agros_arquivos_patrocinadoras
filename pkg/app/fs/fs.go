@@ -1,3 +1,8 @@
+// Package fs fornece definições para gerenciamento de entidades de um sistema
+// de arquivos, como usuários, categorias, arquivos e anexos. Este pacote inclui
+// estruturas que representam dados comuns às entidades, bem como informações
+// específicas sobre arquivos, como extensão, tipo MIME e caminho no sistema de
+// arquivos.
 package fs
 
 import "github.com/google/uuid"

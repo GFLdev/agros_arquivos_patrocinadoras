@@ -1,3 +1,6 @@
+// Package context fornece uma estrutura para gerenciar as informações
+// necessárias ao processamento de solicitações, integrando recursos como
+// logger, configuração, sistema de arquivos e conexão com banco de dados.
 package context
 
 import (
@@ -26,10 +29,14 @@ type Context struct {
 	DB *sql.DB
 }
 
-// GetContext recupera o app.Context associado à solicitação a partir do
-// objeto echo.Context.
+// GetContext retorna o contexto da aplicação a partir do contexto da
+// solicitação do Echo.
 //
-// Retorna o contexto associado à requisição atual.
+// Parâmetros:
+//   - c: contexto da solicitação do Echo, que armazena os dados da requisição.
+//
+// Retorno:
+//   - *Context: ponteiro para o contexto da aplicação associado à solicitação.
 func GetContext(c echo.Context) *Context {
 	return c.Get("appContext").(*Context)
 }

@@ -1,3 +1,7 @@
+// Package logger fornece funcionalidades para criação e configuração de loggers
+// utilizando a biblioteca zap. Ele permite a geração de logs formatados com
+// diferentes níveis de severidade, personalização de encoders, além de suportar
+// saída para console e arquivos.
 package logger
 
 import (
@@ -7,11 +11,10 @@ import (
 	"time"
 )
 
-// CreateLogger cria e configura um zap.Logger para registrar informações de log
-// em tempo de execução. O logger é configurado com um formato de codificação
-// de console e um arquivo de log com timestamp no nome.
+// CreateLogger cria e configura um logger utilizando a biblioteca zap.
 //
-// Retorna o logger configurado.
+// Retornos:
+//   - *zap.Logger: instância configurada do logger.
 func CreateLogger() *zap.Logger {
 	// Configuração do encoder para produção
 	encoderConfig := zap.NewProductionEncoderConfig()
@@ -35,6 +38,5 @@ func CreateLogger() *zap.Logger {
 			"logs/runtime_" + ts + ".log",
 		},
 	}
-
 	return zap.Must(config.Build())
 }

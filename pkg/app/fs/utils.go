@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"bufio"
 	"fmt"
 	"go.uber.org/zap"
@@ -10,32 +11,22 @@ import (
 // WriteToFile cria ou abre um arquivo no caminho especificado e escreve
 // os dados nele.
 //
-// A função cria um novo arquivo (ou substitui o existente) no caminho
-// fornecido, escreve os dados byte a byte e garante que o arquivo seja
-// corretamente fechado e que o buffer de escrita, seja liberado. Em caso
-// de erro ao abrir, escrever ou fechar o arquivo, o erro é retornado.
-//
 // Parâmetros:
-//
-// - path: caminho do arquivo a ser criado ou sobrescrito.
-//
-// - data: dados em formato de slice de bytes que serão escritos no arquivo.
-//
-//   - logr: zap.Logger utilizado para registrar erros ao fechar o arquivo ou
-//     liberar o buffer de escrita.
+//   - path: caminho do arquivo a ser criado ou sobrescrito.
+//   - data: dados em formato de slice de bytes que serão escritos no arquivo.
 //
 // Retorno:
-//
-// - error: retorna um erro caso ocorra algum problema, ou nil caso contrário.
-func WriteToFile(path string, data []byte, logr *zap.Logger) error {
+//   - error: retorna um erro caso ocorra algum problema, ou nil caso contrário.
+func WriteToFile(path string, data []byte) error {
+	logr := logger.CreateLogger()
+
 	// Abertura do arquivo
 	file, err := os.Create(path)
 	if err != nil {
-		return fmt.Errorf("erro a abrir %s: %v", path, err)
+		return fmt.Errorf("erro a abrir %s: %w", path, err)
 	}
 	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
+		if err := file.Close(); err != nil {
 			logr.Error("Erro ao fechar "+path, zap.Error(err))
 		}
 	}(file)
@@ -43,8 +34,7 @@ func WriteToFile(path string, data []byte, logr *zap.Logger) error {
 	// Criação de um buffer de escrita
 	writer := bufio.NewWriter(file)
 	defer func(writer *bufio.Writer) {
-		err := writer.Flush()
-		if err != nil {
+		if err := writer.Flush(); err != nil {
 			logr.Error("Erro ao liberar buffer de escrita", zap.Error(err))
 		}
 	}(writer)
@@ -53,7 +43,7 @@ func WriteToFile(path string, data []byte, logr *zap.Logger) error {
 	for len(data) > 0 {
 		n, err := writer.Write(data)
 		if err != nil {
-			return fmt.Errorf("erro ao escrever em %s: %v", path, err)
+			return fmt.Errorf("erro ao escrever em %s: %w", path, err)
 		}
 		data = data[n:]
 	}

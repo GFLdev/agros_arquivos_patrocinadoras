@@ -82,8 +82,11 @@ type GenericRes struct {
 
 // LoginRes representa a resposta para uma requisição de login.
 type LoginRes struct {
+	// Token representa o token de autenticação retornado após um login
+	// bem-sucedido, obrigatório e validado como uma string não vazia.
 	Token string `json:"token" validate:"required"`
 	// Authenticated indica se o usuário foi autenticado com sucesso.
 	Authenticated bool `json:"authenticated" validate:"required"`
-	Admin         bool `json:"admin" validate:"required"`
+	// Admin indica se o usuário possui privilégios administrativos.
+	Admin bool `json:"admin" validate:"required"`
 }

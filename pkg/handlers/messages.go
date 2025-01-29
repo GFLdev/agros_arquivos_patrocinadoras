@@ -2,7 +2,7 @@ package handlers
 
 type HTTPMessage string
 
-// Mensagens relacionadas ao usuário
+// Mensagens relacionadas ao usuário.
 const (
 	InvalidUserIdMessage HTTPMessage = "Id de usuário inválido."
 	CreatedUserMessage   HTTPMessage = "Usuário criado com sucesso."
@@ -12,7 +12,7 @@ const (
 	DeletedUserMessage   HTTPMessage = "Usuário excluído com sucesso."
 )
 
-// Mensagens relacionadas à categoria
+// Mensagens relacionadas à categoria.
 const (
 	InvalidCategoryIdMessage  HTTPMessage = "Id de categoria inválido."
 	CreatedCategoryMessage    HTTPMessage = "Categoria criada com sucesso."
@@ -22,7 +22,7 @@ const (
 	DeletedCategoryMessage    HTTPMessage = "Categoria excluída com sucesso."
 )
 
-// Mensagens relacionadas ao arquivo
+// Mensagens relacionadas ao arquivo.
 const (
 	InvalidFileIdMessage HTTPMessage = "Id de arquivo inválido."
 	CreatedFileMessage   HTTPMessage = "Arquivo criado com sucesso."
@@ -32,7 +32,7 @@ const (
 	DeletedFileMessage   HTTPMessage = "Arquivo excluído com sucesso."
 )
 
-// Mensagens gerais
+// Mensagens gerais.
 const (
 	BadRequestMessage          HTTPMessage = "Falha na requisição. Verifique os dados e tente novamente."
 	InternalServerErrorMessage HTTPMessage = "Erro interno no sistema. Tente novamente."

@@ -51,7 +51,7 @@ func AuthenticationMiddleware() echo.MiddlewareFunc {
 				&auth.CustomClaims{},
 				func(token *jwt.Token) (interface{}, error) {
 					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-						return nil, fmt.Errorf("método de assinatura inesperado: %v", token.Header["alg"])
+						return nil, fmt.Errorf("método de assinatura inesperado: %w", token.Header["alg"])
 					}
 					return []byte(ctx.Config.JwtSecret), nil
 				},

@@ -6,17 +6,11 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-// ConfigRoutes define as rotas principais da aplicação, separando as
-// funcionalidades para usuários e administradores. As rotas de usuários
-// envolvem operações relacionadas a categorias e arquivos, enquanto as
-// rotas de administradores oferecem funcionalidades adicionais para
-// manipulação de usuários, categorias de arquivos e arquivos.
+// ConfigRoutes define as rotas da aplicação utilizando o framework Echo.
 //
-// As rotas de usuários incluem:
-// - GET e POST para categorias e arquivos.
-//
-// As rotas de administradores incluem:
-// - GET, POST, PATCH e DELETE para usuários, categorias de arquivos e arquivos.
+// Parâmetros:
+//   - e: instância do Echo, usada para registrar as rotas.
+//   - ctx: contexto da aplicação que contém informações e dependências.
 func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	ctx.Logger.Info("Configurando rotas")
 

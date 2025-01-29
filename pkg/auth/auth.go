@@ -1,3 +1,6 @@
+// Package auth fornece funcionalidades relacionadas à autenticação e geração de
+// tokens JWT, incluindo a definição de claims personalizadas e métodos para
+// criar tokens seguros usando o algoritmo de assinatura HS256.
 package auth
 
 import (
@@ -9,14 +12,31 @@ import (
 	"time"
 )
 
+// CustomClaims define uma estrutura personalizada para os claims de um token
+// JWT.
 type CustomClaims struct {
-	Id    uuid.UUID `json:"id"`
-	Name  string    `json:"name"`
-	Admin bool      `json:"admin"`
+	// Id representa o identificador único para os claims, usado para
+	// identificar um usuário.
+	Id uuid.UUID `json:"id"`
+	// Name representa o nome do usuário ou entidade associado aos claims.
+	Name string `json:"name"`
+	// Admin indica se o usuário possui privilégios administrativos.
+	Admin bool `json:"admin"`
 	jwt.RegisteredClaims
 }
 
-// GenerateToken gera token JWT.
+// GenerateToken cria um token JWT com claims personalizados, utilizando o
+// algoritmo HS256.
+//
+// Parâmetros:
+//   - c: contexto das requisições HTTP que contém informações
+//     do request atual.
+//   - userId: identificador único do usuário.
+//   - userName: nome do usuário.
+//
+// Retornos:
+//   - string: token JWT gerado.
+//   - error: erro caso ocorra algum problema durante a geração do token.
 func GenerateToken(c echo.Context, userId uuid.UUID, userName string) (string, error) {
 	ctx := context.GetContext(c)
 
@@ -33,15 +53,12 @@ func GenerateToken(c echo.Context, userId uuid.UUID, userName string) (string, e
 		},
 	}
 
-	// Declaração do token com algoritmo HS256
+	// Declaração do token com algoritmo HS256 e geração do token criptografado
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	// Gerar token criptografado
 	t, err := token.SignedString([]byte(ctx.Config.JwtSecret))
 	if err != nil {
 		ctx.Logger.Error("Erro ao gerar JWT.", zap.Error(err))
 		return "", err
 	}
-
 	return t, nil
 }
