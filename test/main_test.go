@@ -7,15 +7,11 @@ import (
 
 const (
 	TestRoot = "test_data"
-	LogsRoot = "logs"
 )
 
 func TestMain(m *testing.M) {
 	// Configuração inicial antes de todos os testes
 	if err := os.MkdirAll(TestRoot, os.ModePerm); err != nil {
-		panic(err)
-	}
-	if err := os.MkdirAll(LogsRoot, os.ModePerm); err != nil {
 		panic(err)
 	}
 

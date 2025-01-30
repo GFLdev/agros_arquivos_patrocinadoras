@@ -62,13 +62,13 @@ func TestFileSystem_GetEntity(t *testing.T) {
 
 	// Testes
 	if !mock.Fs.EntityExists(userPath) {
-		t.Error("Usuário não existe")
+		t.Error("usuário não existe")
 	}
 	if !mock.Fs.EntityExists(categPath) {
-		t.Error("Categoria não existe")
+		t.Error("categoria não existe")
 	}
 	if !mock.Fs.EntityExists(filePath) {
-		t.Error("Arquivo não existe")
+		t.Error("arquivo não existe")
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 	"io"
@@ -20,6 +21,31 @@ import (
 	"strings"
 	"time"
 )
+
+func CheckUsername(ctx *context.Context, name string) (bool, error) {
+	// Query
+	schema := &ctx.Config.Database.Schema
+	query := fmt.Sprintf(
+		`SELECT %s
+		FROM %s.%s
+		WHERE %s = :name`,
+		schema.UserTable.Columns.UserId,
+		schema.Name,
+		schema.UserTable.Name,
+		schema.UserTable.Columns.Name,
+	)
+
+	// Obtenção da linha
+	var userId uuid.UUID
+	row := ctx.DB.QueryRow(query, sql.Named("name", name))
+	err := row.Scan(&userId)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return true, nil
+	} else if err != nil {
+		return false, err
+	}
+	return false, fmt.Errorf("nome de usuário já existente")
+}
 
 // GetCredentials realiza a busca de informações de login de um usuário no banco
 // de dados com base em seu nome.
@@ -113,6 +139,13 @@ func rollbackCreate(ctx *context.Context, rbData CreateRollbackData) {
 //     de arquivos.
 func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	rbErrors := &RollbackErrors{}
+
+	// Checar nome de usuário
+	ok, err := CheckUsername(ctx, p.Name)
+	if !ok {
+		ctx.Logger.Error("Erro no nome de usuário.", zap.Error(err))
+		return uuid.Nil, err
+	}
 
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
@@ -728,14 +761,19 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
-	var args []sql.NamedArg
+	var args []any
 	var set []string
 	if p.Name != p.OldName {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.UserTable.Columns.Name+" = :name")
 	}
 	if p.Password != "" {
-		args = append(args, sql.Named("password", p.Password))
+		// Criptografar senha
+		hash, err := HashPassword(ctx, p.Password)
+		if err != nil {
+			return fmt.Errorf("não foi possível criptografar senha")
+		}
+		args = append(args, sql.Named("password", hash))
 		set = append(set, schema.UserTable.Columns.Password+" = :password")
 	}
 	args = append(args, sql.Named("updated_at", ts))
@@ -754,7 +792,7 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 
 	// Atualização
 	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args)
+	res, rbErrors.DB = tx.Exec(update, args...)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível atualizar usuário")
@@ -801,30 +839,30 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	ts := time.Now().Unix()
 	oldPath := filepath.Join(
 		ctx.FileSystem.Root,
+		p.OldUserId.String(),
+		p.CategId.String(),
+	)
+	newPath := filepath.Join(
+		ctx.FileSystem.Root,
 		p.UserId.String(),
 		p.CategId.String(),
 	)
-	newPath := ctx.FileSystem.Root
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
-	var args []sql.NamedArg
+	var args []any
 	var set []string
-	if p.UserId != p.OldUserId {
-		newPath = filepath.Join(newPath, p.UserId.String())
-		if !ctx.FileSystem.EntityExists(newPath) {
+	if oldPath != newPath {
+		if !ctx.FileSystem.EntityExists(filepath.Dir(newPath)) {
 			rbErrors.DB = fmt.Errorf(
 				"não pôde atualizar categoria: diretório do usuário %s não existe",
-				p.OldUserId.String(),
+				filepath.Dir(newPath),
 			)
 			return rbErrors.DB
 		}
-		args = append(args, sql.Named("user_id", p.UserId))
+		args = append(args, sql.Named("user_id", p.UserId.String()))
 		set = append(set, schema.CategTable.Columns.UserId+" = :user_id")
-	} else {
-		newPath = filepath.Join(newPath, p.OldUserId.String())
 	}
-	newPath = filepath.Join(newPath, p.CategId.String())
 	if p.Name != p.OldName {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.CategTable.Columns.Name+" = :name")
@@ -854,7 +892,7 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 
 	// Atualização
 	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args)
+	res, rbErrors.DB = tx.Exec(update, args...)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível atualizar categoria")
@@ -909,32 +947,31 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 	oldPath := filepath.Join(
 		ctx.FileSystem.Root,
 		p.UserId.String(),
-		p.CategId.String(),
-		p.FileId.String()+p.Extension,
+		p.OldCategId.String(),
+		p.FileId.String()+p.OldExtension,
 	)
-	newPath := filepath.Join(ctx.FileSystem.Root, p.UserId.String())
+	newPath := filepath.Join(
+		ctx.FileSystem.Root,
+		p.UserId.String(),
+		p.CategId.String(),
+		p.FileId.String(),
+	)
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
-	var args []sql.NamedArg
+	var args []any
 	var set []string
-	if p.CategId != p.OldCategId {
-		newPath = filepath.Join(newPath, p.CategId.String())
-		if !ctx.FileSystem.EntityExists(newPath) {
+	if oldPath != newPath {
+		if !ctx.FileSystem.EntityExists(filepath.Dir(newPath)) {
 			rbErrors.DB = fmt.Errorf(
-				"não pôde atualizar arquivo: diretório da categoria %s "+
-					"não existe para o usuário %s",
-				p.CategId.String(),
-				p.UserId.String(),
+				"não pôde atualizar arquivo: diretório %s a categoria não existe",
+				filepath.Dir(newPath),
 			)
 			return rbErrors.DB
 		}
-		args = append(args, sql.Named("categ_id", p.CategId))
+		args = append(args, sql.Named("categ_id", p.CategId.String()))
 		set = append(set, schema.FileTable.Columns.CategId+" = :categ_id")
-	} else {
-		newPath = filepath.Join(newPath, p.OldCategId.String())
 	}
-	newPath = filepath.Join(newPath, p.FileId.String())
 	if p.Name != p.OldName {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.FileTable.Columns.Name+" = :name")
@@ -943,6 +980,8 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 		args = append(args, sql.Named("extension", p.Extension))
 		set = append(set, schema.FileTable.Columns.Extension+" = :extension")
 		newPath = newPath + p.Extension
+	} else {
+		newPath = newPath + p.OldExtension
 	}
 	if p.Mimetype != p.OldMimetype {
 		args = append(args, sql.Named("mimetype", p.Mimetype))
@@ -973,7 +1012,7 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 
 	// Atualização
 	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args)
+	res, rbErrors.DB = tx.Exec(update, args...)
 	if rbErrors.DB != nil {
 		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(rbErrors.DB))
 		return fmt.Errorf("não foi possível atualizar arquivo")
@@ -994,28 +1033,21 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 		if rbErrors.FS != nil {
 			return rbErrors.FS
 		}
-		defer func() {
-			if rbErrors.FS != nil {
+		defer func(ctx *context.Context, rbData UpdateRollbackData) {
+			if rbData.FS != nil {
 				// Tentativa de exclusão do arquivo criado, caso tenha erros
-				err := ctx.FileSystem.DeleteEntity(newPath)
+				err := ctx.FileSystem.DeleteEntity(rbData.NewPath)
 				if err != nil {
-					ctx.Logger.Error(
-						"Tentativa de limpeza falhou",
-						zap.Error(err),
-					)
+					ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
 				}
 			} else {
-				// Tentativa de exclusão do arquivo antigo, quando não tiver
-				// erros
-				err := ctx.FileSystem.DeleteEntity(oldPath)
+				// Tentativa de exclusão do arquivo antigo, quando não tiver erros
+				err := ctx.FileSystem.DeleteEntity(rbData.OldPath)
 				if err != nil {
-					ctx.Logger.Error(
-						"Tentativa de limpeza falhou",
-						zap.Error(err),
-					)
+					ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
 				}
 			}
-		}()
+		}(ctx, rbData)
 	}
 
 	// Confirmar a transação

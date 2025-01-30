@@ -131,8 +131,8 @@ type UserDelete struct {
 
 // CategDelete define os parâmetros para a exclusão de uma categoria.
 type CategDelete struct {
-	// UserId especifica o identificador do usuário associado à categoria.
-	UserId uuid.UUID
+	// UserDelete contém os parâmetros adicionais da exclusão de usuário.
+	UserDelete
 	// CategId especifica o identificador da categoria a ser excluída.
 	CategId uuid.UUID
 }

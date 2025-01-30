@@ -30,10 +30,10 @@ func WriteToFile(path string, data []byte) error {
 	// Criação de um buffer de escrita
 	writer := bufio.NewWriter(file)
 	defer func(file *os.File, writer *bufio.Writer) {
-		if err := writer.Flush(); err != nil {
+		if err = writer.Flush(); err != nil {
 			logr.Error("Erro ao liberar buffer de escrita", zap.Error(err))
 		}
-		if err := file.Close(); err != nil {
+		if err = file.Close(); err != nil {
 			logr.Error("Erro ao fechar "+path, zap.Error(err))
 		}
 	}(file, writer)
