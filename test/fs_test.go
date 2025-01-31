@@ -3,6 +3,9 @@ package test
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"io"
+	"os"
 	"path/filepath"
 	"testing"
 )
@@ -25,68 +28,79 @@ func newMock() *mockData {
 	}
 }
 
-func TestFileSystem_CreateEntity(t *testing.T) {
-	// Criação
-	mock := newMock()
-	userPath := filepath.Join(mock.Fs.Root, mock.UserId.String())
-	categPath := filepath.Join(userPath, mock.CategId.String())
-	filePath := filepath.Join(categPath, mock.FileId.String()+".txt")
+func TestFileSystem_CreateReadEntities(t *testing.T) {
+	// Cenário positivo
+	t.Run(
+		"Should_Create_And_Read_Entities",
+		func(t *testing.T) {
+			m := newMock()
 
-	// Testes
-	if err := mock.Fs.CreateEntity(userPath, nil, fs.User); err != nil {
-		t.Error(err)
-	}
-	if err := mock.Fs.CreateEntity(categPath, nil, fs.Category); err != nil {
-		t.Error(err)
-	}
-	if err := mock.Fs.CreateEntity(filePath, &mock.Content, fs.File); err != nil {
-		t.Error(err)
-	}
-}
+			// Caminhos
+			userPath := filepath.Join(m.Fs.Root, m.UserId.String())
+			categPath := filepath.Join(userPath, m.CategId.String())
+			filePath := filepath.Join(categPath, m.FileId.String()+".txt")
+			content := []byte("Hello World")
 
-func TestFileSystem_GetEntity(t *testing.T) {
-	// Criação
-	mock := newMock()
-	userPath := filepath.Join(mock.Fs.Root, mock.UserId.String())
-	categPath := filepath.Join(userPath, mock.CategId.String())
-	filePath := filepath.Join(categPath, mock.FileId.String()+".txt")
-	if err := mock.Fs.CreateEntity(userPath, nil, fs.User); err != nil {
-		panic(err)
-	}
-	if err := mock.Fs.CreateEntity(categPath, nil, fs.Category); err != nil {
-		panic(err)
-	}
-	if err := mock.Fs.CreateEntity(filePath, &mock.Content, fs.File); err != nil {
-		panic(err)
-	}
+			// Criar usuário
+			err := m.Fs.CreateEntity(userPath, nil, fs.User)
+			assert.NoError(t, err)
+			ok := m.Fs.EntityExists(userPath)
+			assert.True(t, ok, "Usuário não foi criado no caminho "+userPath)
 
-	// Testes
-	if !mock.Fs.EntityExists(userPath) {
-		t.Error("usuário não existe")
-	}
-	if !mock.Fs.EntityExists(categPath) {
-		t.Error("categoria não existe")
-	}
-	if !mock.Fs.EntityExists(filePath) {
-		t.Error("arquivo não existe")
-	}
+			// Criar categoria
+			err = m.Fs.CreateEntity(categPath, nil, fs.Category)
+			assert.NoError(t, err)
+			ok = m.Fs.EntityExists(categPath)
+			assert.True(t, ok, "Categoria não foi criada no caminho "+categPath)
+
+			// Criar arquivo
+			err = m.Fs.CreateEntity(filePath, &content, fs.File)
+			assert.NoError(t, err)
+			ok = m.Fs.EntityExists(filePath)
+			assert.True(t, ok, "Usuário não foi criado no caminho "+filePath)
+
+			// Verificar conteúdo do arquivo
+			file, err := os.Open(filePath)
+			assert.NoError(t, err)
+			writtenContent, err := io.ReadAll(file)
+			assert.NoError(t, err)
+			assert.Equal(t, content, writtenContent)
+		},
+	)
+
+	// Cenários negativos
+	t.Run(
+		"Should_Return_Error_When_Creating_Entity_With_Invalid_Path",
+		func(t *testing.T) {
+			m := newMock()
+			invalidPath := "caminho_invalido"
+
+			// Tentativa de criar entidade num caminho inválido
+			err := m.Fs.CreateEntity(invalidPath, nil, fs.User)
+			assert.Error(t, err)
+		},
+	)
+
+	t.Run(
+		"Should_Return_Error_When_Creating_Entity_With_Non_Existing_Parent",
+		func(t *testing.T) {
+			m := newMock()
+			userPath := filepath.Join(m.Fs.Root, m.UserId.String())
+			categPath := filepath.Join(userPath, m.CategId.String())
+
+			// Tentativa de criar entidade sem ter pai
+			err := m.Fs.CreateEntity(categPath, nil, fs.Category)
+			assert.Error(t, err)
+		},
+	)
 }
 
 func TestFileSystem_UpdateEntity(t *testing.T) {
-	// Criação
+	// Configuração inicial do mock e caminhos
 	mock := newMock()
 	userPath := filepath.Join(mock.Fs.Root, mock.UserId.String())
 	categPath := filepath.Join(userPath, mock.CategId.String())
 	filePath := filepath.Join(categPath, mock.FileId.String()+".txt")
-	if err := mock.Fs.CreateEntity(userPath, nil, fs.User); err != nil {
-		panic(err)
-	}
-	if err := mock.Fs.CreateEntity(categPath, nil, fs.Category); err != nil {
-		panic(err)
-	}
-	if err := mock.Fs.CreateEntity(filePath, &mock.Content, fs.File); err != nil {
-		panic(err)
-	}
 
 	// Testes
 	newCateg := uuid.New()

@@ -5,11 +5,11 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"encoding/json"
 	"fmt"
+	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"io"
 )
 
 // BodyUnmarshall realiza o desagrupamento (unmarshal) do corpo da requisição
@@ -22,21 +22,25 @@ import (
 //   - *T: ponteiro para a estrutura desagrupada.
 //   - error: erro, caso ocorra ao ler ou desagrupar o corpo da requisição.
 func BodyUnmarshall[T any](c echo.Context) (*T, error) {
-	// Obtenção do logger e leitura do body como JSON
+	// Obtenção do logger e decodificador
 	logr := context.GetContext(c).Logger
-	payload, err := io.ReadAll(c.Request().Body)
-	if err != nil {
-		logr.Error("Erro ao ler o corpo da requisição", zap.Error(err))
-		return nil, err
-	}
+	decoder := json.NewDecoder(c.Request().Body)
+	decoder.DisallowUnknownFields()
 
 	// Desagrupamento e retorno
 	result := new(T)
-	err = json.Unmarshal(payload, result)
-	if err != nil {
-		logr.Error("Erro ao desagrupar o corpo da requisição", zap.Error(err))
+	if err := decoder.Decode(result); err != nil {
+		logr.Error("Body da requisição inválido.", zap.Error(err))
 		return nil, err
 	}
+
+	// Validação de campos obrigatórios
+	validate := validator.New()
+	if err := validate.Struct(result); err != nil {
+		logr.Error("Campos obrigatórios ausentes.", zap.Error(err))
+		return nil, err
+	}
+
 	return result, nil
 }
 

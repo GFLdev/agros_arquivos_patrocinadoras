@@ -4,12 +4,15 @@ type HTTPMessage string
 
 // Mensagens relacionadas ao usuário.
 const (
-	InvalidUserIdMessage HTTPMessage = "Id de usuário inválido."
-	CreatedUserMessage   HTTPMessage = "Usuário criado com sucesso."
-	UserNotFoundMessage  HTTPMessage = "Usuário não encontrado."
-	UsersNotFoundMessage HTTPMessage = "Nenhum usuário foi encontrado."
-	UpdatedUserMessage   HTTPMessage = "Usuário atualizado com sucesso."
-	DeletedUserMessage   HTTPMessage = "Usuário excluído com sucesso."
+	InvalidUserIdMessage   HTTPMessage = "Id de usuário inválido."
+	CreatedUserMessage     HTTPMessage = "Usuário criado com sucesso."
+	UserNotFoundMessage    HTTPMessage = "Usuário não encontrado."
+	UsersNotFoundMessage   HTTPMessage = "Nenhum usuário foi encontrado."
+	UpdatedUserMessage     HTTPMessage = "Usuário atualizado com sucesso."
+	DeletedUserMessage     HTTPMessage = "Usuário excluído com sucesso."
+	LoginSuccessMessage    HTTPMessage = "Login realizado com sucesso."
+	InvalidPasswordMessage HTTPMessage = "Senha com menos de 4 caracteres."
+	DuplicateUserMessage   HTTPMessage = "Nome de usuário já existe."
 )
 
 // Mensagens relacionadas à categoria.

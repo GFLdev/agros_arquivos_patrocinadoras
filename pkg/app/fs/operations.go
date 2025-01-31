@@ -2,8 +2,11 @@ package fs
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 // CreateEntity cria uma entidade no sistema de arquivos.
@@ -18,6 +21,15 @@ import (
 //   - error: retorna um erro se ocorrer falha na criação da entidade ou se o
 //     tipo de entidade for inválido.
 func (fs *FileSystem) CreateEntity(path string, content *[]byte, entity EntityType) error {
+	if fs.EntityExists(path) {
+		return fmt.Errorf("%s já existe", path)
+	}
+
+	baseName := filepath.Base(strings.TrimSuffix(path, filepath.Ext(path)))
+	if uuid.Validate(baseName) != nil {
+		return fmt.Errorf("caminho inválido (UUID): %s", path)
+	}
+
 	switch entity {
 	case File:
 		if content == nil {

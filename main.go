@@ -9,6 +9,7 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/db"
 	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
+	"database/sql"
 	"fmt"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
@@ -107,6 +108,12 @@ func main() {
 
 	// Banco de dados
 	dataBase := db.GetSqlDB(&cfg.Database, logr)
+	defer func(dataBase *sql.DB) {
+		err := dataBase.Close()
+		if err != nil {
+			logr.Error("Erro ao fechar banco de dados", zap.Error(err))
+		}
+	}(dataBase)
 
 	// Contexto da aplicação
 	ctx := &context.Context{

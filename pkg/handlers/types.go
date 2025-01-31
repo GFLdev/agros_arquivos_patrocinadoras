@@ -66,27 +66,11 @@ type UpdateFileReq struct {
 	Content []byte `json:"content" validate:"required"`
 }
 
-// ErrorRes representa a estrutura de uma resposta de erro.
-type ErrorRes struct {
-	// Message especifica a mensagem descritiva do erro.
-	Message string `json:"message" validate:"required"`
-	// Error especifica os detalhes técnicos do erro.
-	Error string `json:"error" validate:"required"`
-}
-
-// GenericRes representa a estrutura de uma resposta genérica.
-type GenericRes struct {
-	// Message especifica a mensagem descritiva da resposta.
-	Message string `json:"message" validate:"required"`
-}
-
-// LoginRes representa a resposta para uma requisição de login.
-type LoginRes struct {
-	// Token representa o token de autenticação retornado após um login
-	// bem-sucedido, obrigatório e validado como uma string não vazia.
-	Token string `json:"token" validate:"required"`
-	// Authenticated indica se o usuário foi autenticado com sucesso.
-	Authenticated bool `json:"authenticated" validate:"required"`
-	// Admin indica se o usuário possui privilégios administrativos.
-	Admin bool `json:"admin" validate:"required"`
+// CreateResponse representa a resposta retornada após uma operação de criação
+// bem sucedida.
+type CreateResponse struct {
+	// Id é o identificador único da entidade.
+	Id uuid.UUID `json:"id"`
+	// Message é a descrição de retorno da operação.
+	Message HTTPMessage `json:"message"`
 }

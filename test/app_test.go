@@ -2,11 +2,6 @@ package test
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app"
-	"agros_arquivos_patrocinadoras/pkg/app/config"
-	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/app/db"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
-	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"github.com/google/uuid"
 	"testing"
 )
@@ -34,19 +29,6 @@ func newMockFile(userId, categId uuid.UUID) app.FileParams {
 		Extension: ".txt",
 		Mimetype:  "text/plain",
 		Content:   &content,
-	}
-}
-
-func newContext() *context.Context {
-	logr := logger.CreateLogger()
-	cfg := config.LoadConfig(logr)
-	filesystem := &fs.FileSystem{Root: TestRoot}
-	dataBase := db.GetSqlDB(&cfg.Database, logr)
-	return &context.Context{
-		Logger:     logr,
-		Config:     cfg,
-		FileSystem: filesystem,
-		DB:         dataBase,
 	}
 }
 
