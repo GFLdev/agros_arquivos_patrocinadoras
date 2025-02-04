@@ -9,9 +9,7 @@ package handlers
 import (
 	"agros_arquivos_patrocinadoras/pkg/app"
 	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/auth"
-	"fmt"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"net/http"
@@ -56,56 +54,6 @@ func LoginHandler(c echo.Context) error {
 		"token":   token,
 		"message": LoginSuccessMessage,
 	})
-}
-
-// DownloadHandler gerencia o envio de um arquivo para download.
-//
-// Parâmetros:
-//   - c: contexto Echo contendo as informações da requisição HTTP.
-//
-// Retorno:
-//   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
-//     seja bem-sucedido.
-func DownloadHandler(c echo.Context) error {
-	// Cabeçalho
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
-
-	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
-	}
-	categId, err := ParseEntityUUID(c, fs.Category)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
-	}
-	fileId, err := ParseEntityUUID(c, fs.File)
-	if err != nil {
-		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
-	}
-
-	// Obtenção do contexto da aplicação e dos metadados do arquivo
-	ctx := context.GetContext(c)
-	file, err := app.QueryFileById(ctx, fileId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
-	}
-	path := fmt.Sprintf(
-		"%s/%s/%s/%s%s",
-		ctx.FileSystem.Root,
-		userId,
-		categId,
-		fileId,
-		file.Extension,
-	)
-
-	// Verificar existência no sistema de arquivos
-	exists := ctx.FileSystem.EntityExists(path)
-	if !exists {
-		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
-	}
-	c.Response().Header().Add(echo.HeaderContentType, file.Mimetype)
-	return c.Attachment(path, file.Name)
 }
 
 // CreateUserHandler gerencia a criação de um novo usuário no sistema.
@@ -169,7 +117,7 @@ func CreateCategoryHandler(c echo.Context) error {
 	}
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
@@ -179,10 +127,14 @@ func CreateCategoryHandler(c echo.Context) error {
 		UserId: userId,
 		Name:   body.Name,
 	}
-	if _, err = app.CreateCategory(ctx, categ); err != nil {
+	id, err := app.CreateCategory(ctx, categ)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	return c.JSON(http.StatusCreated, CreatedCategoryMessage)
+	return c.JSON(http.StatusCreated, echo.Map{
+		"id":      id.String(),
+		"message": string(CreatedCategoryMessage),
+	})
 }
 
 // CreateFileHandler gerencia a criação de um novo arquivo em uma categoria
@@ -206,28 +158,31 @@ func CreateFileHandler(c echo.Context) error {
 	}
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	_, err = ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
 
 	// Criar arquivo
 	file := app.FileParams{
-		UserId:    userId,
 		CategId:   categId,
 		Name:      body.Name,
 		Extension: body.Extension,
 		Mimetype:  body.Mimetype,
 		Content:   &body.Content,
 	}
-	if _, err = app.CreateFile(ctx, file); err != nil {
+	id, err := app.CreateFile(ctx, file)
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	return c.JSON(http.StatusCreated, CreatedFileMessage)
+	return c.JSON(http.StatusCreated, echo.Map{
+		"id":      id.String(),
+		"message": string(CreatedFileMessage),
+	})
 }
 
 // GetAllUsers obtém todos os usuários presentes no repositório.
@@ -264,7 +219,7 @@ func GetUserById(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
@@ -291,7 +246,7 @@ func GetAllCategories(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
@@ -319,11 +274,11 @@ func GetCategoryById(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, fs.User)
+	_, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
@@ -350,11 +305,11 @@ func GetAllFiles(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, fs.User)
+	_, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
@@ -380,27 +335,28 @@ func GetFileById(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	// Parâmetros
-	_, err := ParseEntityUUID(c, fs.User)
+	// Parâmetros da URL
+	_, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	_, err = ParseEntityUUID(c, fs.Category)
+	_, err = ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
-	fileId, err := ParseEntityUUID(c, fs.File)
+	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
 
-	// Obtenção do contexto da aplicação e do arquivo
+	// Obtenção do contexto da aplicação e dos dados do arquivo
 	ctx := context.GetContext(c)
-	res, err := app.QueryFileById(ctx, fileId)
+	file, err := app.QueryFileById(ctx, fileId)
 	if err != nil {
-		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
 	}
-	return c.JSON(http.StatusOK, res)
+	c.Response().Header().Add(echo.HeaderContentType, file.Mimetype)
+	return c.Blob(http.StatusOK, file.Mimetype, file.Blob)
 }
 
 // UpdateUserHandler gerencia a atualização dos dados de um usuário existente.
@@ -423,30 +379,20 @@ func UpdateUserHandler(c echo.Context) error {
 	}
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
-	}
-
-	// Obter os dados do usuário
-	data, err := app.QueryUserById(ctx, userId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
 	}
 
 	// Validar senha e alteração
 	if len(body.Password) < 4 {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
-	user := app.UserUpdate{
-		UserId:  userId,
-		OldName: data.Name,
-		UserParams: app.UserParams{
-			Name:     body.Name,
-			Password: body.Password,
-		},
+	user := app.UserParams{
+		Name:     body.Name,
+		Password: body.Password,
 	}
-	if err = app.UpdateUser(ctx, user); err != nil {
+	if err = app.UpdateUser(ctx, userId, user); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, UpdatedUserMessage)
@@ -473,32 +419,21 @@ func UpdateCategoryHandler(c echo.Context) error {
 	}
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	_, err = ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
 
-	// Obter dados do usuário
-	data, err := app.QueryCategoryById(ctx, categId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
-	}
-
 	// Alteração
-	categ := app.CategUpdate{
-		CategId:   categId,
-		OldUserId: userId,
-		OldName:   data.Name,
-		CategParams: app.CategParams{
-			UserId: body.UserId,
-			Name:   body.Name,
-		},
+	categ := app.CategParams{
+		UserId: body.UserId,
+		Name:   body.Name,
 	}
-	if err = app.UpdateCategory(ctx, categ); err != nil {
+	if err = app.UpdateCategory(ctx, categId, categ); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, UpdatedCategoryMessage)
@@ -524,45 +459,30 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	_, err = ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	_, err = ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
-	fileId, err := ParseEntityUUID(c, fs.File)
+	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
 
-	// Obter dados do usuário
-	data, err := app.QueryFileById(ctx, fileId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
-	}
-
 	// Alteração
-	file := app.FileUpdate{
-		FileId:       fileId,
-		OldCategId:   categId,
-		OldName:      data.Name,
-		OldExtension: data.Extension,
-		OldMimetype:  data.Mimetype,
-		FileParams: app.FileParams{
-			UserId:    userId,
-			CategId:   body.CategId,
-			Name:      body.Name,
-			Extension: body.Extension,
-			Mimetype:  body.Mimetype,
-			Content:   &body.Content,
-		},
+	file := app.FileParams{
+		CategId:   body.CategId,
+		Name:      body.Name,
+		Extension: body.Extension,
+		Mimetype:  body.Mimetype,
+		Content:   &body.Content,
 	}
-	if err = app.UpdateFile(ctx, file); err != nil {
+	if err = app.UpdateFile(ctx, fileId, file); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-
 	return c.JSON(http.StatusOK, UpdatedFileMessage)
 }
 
@@ -579,15 +499,14 @@ func DeleteUser(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
 
 	// Obtenção do contexto da aplicação e remoção do usuário
 	ctx := context.GetContext(c)
-	user := app.UserDelete{UserId: userId}
-	if err = app.DeleteUser(ctx, user); err != nil {
+	if err = app.DeleteUser(ctx, userId); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, DeletedUserMessage)
@@ -606,22 +525,18 @@ func DeleteCategory(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	_, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
 
 	// Obtenção do contexto da aplicação e remoção da categoria
 	ctx := context.GetContext(c)
-	categ := app.CategDelete{
-		UserDelete: app.UserDelete{UserId: userId},
-		CategId:    categId,
-	}
-	if err = app.DeleteCategory(ctx, categ); err != nil {
+	if err = app.DeleteCategory(ctx, categId); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, DeletedCategoryMessage)
@@ -640,36 +555,24 @@ func DeleteFile(c echo.Context) error {
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	userId, err := ParseEntityUUID(c, fs.User)
+	_, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	categId, err := ParseEntityUUID(c, fs.Category)
+	_, err = ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
-	fileId, err := ParseEntityUUID(c, fs.File)
+	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
 
 	// Obtenção do contexto da aplicação e dos dados do arquivo
 	ctx := context.GetContext(c)
-	data, err := app.QueryFileById(ctx, fileId)
-	if err != nil {
-		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
-	}
 
 	// Remoção do arquivo
-	file := app.FileDelete{
-		CategDelete: app.CategDelete{
-			UserDelete: app.UserDelete{UserId: userId},
-			CategId:    categId,
-		},
-		FileId:    fileId,
-		Extension: data.Extension,
-	}
-	if err = app.DeleteFile(ctx, file); err != nil {
+	if err = app.DeleteFile(ctx, fileId); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, DeletedFileMessage)

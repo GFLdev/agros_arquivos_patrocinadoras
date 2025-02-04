@@ -97,6 +97,8 @@ type FileTable struct {
 	Extension string `json:"extension"`
 	// Mimetype define a coluna que especifica o tipo MIME do arquivo.
 	Mimetype string `json:"mimetype"`
+	// Blob define a coluna que especifica o conteúdo do arquivo.
+	Blob string `json:"blob"`
 	// UpdatedAt define a coluna da última atualização do arquivo.
 	UpdatedAt string `json:"updated_at"`
 }

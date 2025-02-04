@@ -43,6 +43,8 @@ type FileModel struct {
 	// Mimetype representa o tipo de mídia do arquivo, indicando seu formato e
 	// como ele deve ser interpretado ou processado.
 	Mimetype string `json:"mimetype"`
+	// Blob armazena os dados brutos do arquivo como uma sequência de bytes.
+	Blob []byte `json:"blob"`
 	// UpdatedAt representa o timestamp da última atualização dos dados
 	// do arquivo, armazenado como um tempo Unix em segundos.
 	UpdatedAt int64 `json:"updated_at"`

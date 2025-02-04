@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"encoding/json"
 	"fmt"
 	"github.com/go-playground/validator/v10"
@@ -87,19 +86,19 @@ func LogHTTPDetails(c echo.Context, level zapcore.Level, msg string, fields ...z
 // Parâmetros:
 //   - c: contexto da requisição HTTP (do pacote echo).
 //   - entityType: tipo da entidade que define qual parâmetro UUID será lido
-//     (fs.User, fs.Category, fs.File).
+//     (User, Category, File).
 //
 // Retornos:
 //   - uuid.UUID: o UUID extraído e parseado do parâmetro.
 //   - error: erro, caso o UUID não seja encontrado ou inválido.
-func ParseEntityUUID(c echo.Context, entityType fs.EntityType) (uuid.UUID, error) {
+func ParseEntityUUID(c echo.Context, entityType EntityType) (uuid.UUID, error) {
 	var param string
 	switch entityType {
-	case fs.User:
+	case User:
 		param = c.Param("userId")
-	case fs.Category:
+	case Category:
 		param = c.Param("categId")
-	case fs.File:
+	case File:
 		param = c.Param("fileId")
 	default:
 		return uuid.Nil, fmt.Errorf("entidade %d não suportada", entityType)

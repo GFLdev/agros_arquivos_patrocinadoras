@@ -4,7 +4,6 @@
 package context
 
 import (
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/types/config"
 	"database/sql"
 	"github.com/labstack/echo/v4"
@@ -21,9 +20,6 @@ type Context struct {
 	// Config contém as configurações necessárias para o aplicativo,
 	// como credenciais de banco de dados, parâmetros de ambiente, etc.
 	Config *config.Config
-	// FileSystem é o sistema de arquivos que gerencia operações de leitura
-	// e escrita de arquivos durante o processamento.
-	FileSystem *fs.FileSystem
 	// DB é a conexão com o banco de dados, usada para executar operações de
 	// consulta e modificação de dados.
 	DB *sql.DB

@@ -4,41 +4,28 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/config"
 	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"fmt"
 	"os"
 	"testing"
 )
 
-const (
-	TestRoot = "test_data"
-)
-
 func newContext() *context.Context {
 	logr := logger.CreateLogger()
 	cfg := config.LoadConfig(logr)
-	filesystem := &fs.FileSystem{Root: TestRoot}
 	dataBase := db.GetSqlDB(&cfg.Database, logr)
 	return &context.Context{
-		Logger:     logr,
-		Config:     cfg,
-		FileSystem: filesystem,
-		DB:         dataBase,
+		Logger: logr,
+		Config: cfg,
+		DB:     dataBase,
 	}
 }
 
 func TestMain(m *testing.M) {
-	// Configuração inicial antes de todos os testes
-	if err := os.MkdirAll(TestRoot, os.ModePerm); err != nil {
-		panic(err)
-	}
-
 	// Executa os testes
 	code := m.Run()
 
 	// Cleanup e finalização
-	_ = os.RemoveAll(TestRoot)
 	ctx := newContext()
 
 	// Apagar dados do banco

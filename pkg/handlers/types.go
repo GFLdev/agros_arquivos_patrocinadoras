@@ -2,6 +2,18 @@ package handlers
 
 import "github.com/google/uuid"
 
+// EntityType define os tipos de entidades possíveis no sistema.
+type EntityType int
+
+const (
+	// User representa um tipo de entidade para usuários.
+	User EntityType = iota
+	// Category representa um tipo de entidade para categorias.
+	Category
+	// File representa um tipo de entidade para arquivos.
+	File
+)
+
 // LoginReq representa os dados necessários para autenticação de um usuário.
 type LoginReq struct {
 	// Name especifica o nome de usuário para autenticação.

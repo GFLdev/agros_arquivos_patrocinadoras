@@ -29,9 +29,8 @@ func ContextMiddleware(ctx *context.Context) echo.MiddlewareFunc {
 func AuthenticationMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Ignorar rota [POST] /login
-			// FIXME: Retirar 'c.Path() == "/user"'
-			if (c.Path() == "/login" || c.Path() == "/user") && c.Request().Method == echo.POST {
+			// FIXME: Ignorar rota [POST] /login
+			if c.Path() != "/" {
 				return next(c)
 			}
 

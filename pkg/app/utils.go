@@ -2,6 +2,7 @@ package app
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
+	"fmt"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,7 +21,7 @@ func HashPassword(ctx *context.Context, password string) (string, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		ctx.Logger.Error("Erro ao gerar hash da senha.", zap.Error(err))
-		return "", err
+		return "", fmt.Errorf("error ao criptografar senha")
 	}
 	return string(hash), nil
 }

@@ -37,8 +37,4 @@ func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	e.GET("/user/:userId/category/:categId/file/:fileId", handlers.GetFileById)
 	e.PATCH("/user/:userId/category/:categId/file/:fileId", handlers.UpdateFileHandler)
 	e.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFile)
-
-	// Download
-	e.GET("/user/:userId/category/:categId/file/:fileId/download",
-		handlers.DownloadHandler)
 }

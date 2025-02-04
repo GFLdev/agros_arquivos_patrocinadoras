@@ -7,17 +7,14 @@ package app
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/types/db"
 	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	goora "github.com/sijms/go-ora/v2"
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
-	"io"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -42,23 +39,12 @@ func CheckUsername(ctx *context.Context, name string) (bool, error) {
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return true, nil
 	} else if err != nil {
-		return false, err
+		ctx.Logger.Error("Erro ao buscar usuário", zap.Error(err))
+		return false, fmt.Errorf("não foi possível procurar usuário")
 	}
 	return false, fmt.Errorf("nome de usuário já existente")
 }
 
-// GetCredentials realiza a busca de informações de login de um usuário no banco
-// de dados com base em seu nome.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação contendo recursos necessários como o banco
-//     de dados e configurações.
-//   - name: string representando o nome do usuário a ser procurado.
-//
-// Retorno:
-//   - LoginCompare: estrutura contendo o ID do usuário e o hash da senha.
-//   - error: erro que pode ocorrer durante a busca, como falhas de query ou
-//     ausência de informações.
 func GetCredentials(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
@@ -76,7 +62,7 @@ func GetCredentials(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	// Obtenção da linha
 	rows, err := ctx.DB.Query(query, sql.Named("name", p.Name))
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("não foi possível obter os usuários")
+		return uuid.Nil, fmt.Errorf("usuário não encontrado")
 	}
 	defer closeRows(ctx, rows)
 
@@ -96,54 +82,21 @@ func GetCredentials(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	return uuid.Nil, fmt.Errorf("não autenticado")
 }
 
-// rollbackCreate realiza um rollback em caso de falha durante a criação de
-// uma entidade no banco de dados e/ou no sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação que contém recursos compartilhados como
-//     banco de dados, logger e sistema de arquivos.
-//   - rbData: estrutura CreateRollbackData contendo informações da transação,
-//     caminho no sistema de arquivos e captura de erros durante o rollback.
-func rollbackCreate(ctx *context.Context, rbData CreateRollbackData) {
-	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
-		// Tentativas de rollback no banco
-		if rbData.DB != nil {
-			if err := rbData.Tx.Rollback(); err != nil {
-				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
-			}
-		}
-
-		// Tentativa de exclusão do arquivo/diretório, caso tenha sido criado
-		if rbData.Path != "" && rbData.FS != nil {
-			err := ctx.FileSystem.DeleteEntity(rbData.Path)
-			if err != nil {
-				ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
-			}
+func rollback(ctx *context.Context, tx *sql.Tx, err *error) {
+	if tx != nil && *err != nil {
+		// Tentativa de rollback no banco
+		if *err = tx.Rollback(); *err != nil {
+			ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(*err))
 		}
 	}
 }
 
-// CreateUser cria um registro de um novo usuário no banco de dados e
-// configura um diretório correspondente no sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: ponteiro para o contexto da aplicação, contendo recursos como o
-//     banco de dados, sistema de arquivos, e informações de configuração.
-//   - p: estrutura UserParams com os dados necessários para criar o usuário
-//     (ex: nome, senha).
-//
-// Retorno:
-//   - uuid.UUID: UUID do usuário criado.
-//   - error: retorna qualquer erro que possa ocorrer durante o processo de
-//     criação, como falhas na transação ou erros na interação com o sistema
-//     de arquivos.
 func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
-	rbErrors := &RollbackErrors{}
+	var err error
 
 	// Checar nome de usuário
 	ok, err := CheckUsername(ctx, p.Name)
 	if !ok {
-		ctx.Logger.Error("Erro no nome de usuário.", zap.Error(err))
 		return uuid.Nil, err
 	}
 
@@ -154,23 +107,16 @@ func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
-	path := filepath.Join(ctx.FileSystem.Root, userId.String())
 
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := CreateRollbackData{
-		Tx:             tx,
-		Path:           path,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackCreate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Insert query
 	schema := &ctx.Config.Database.Schema
@@ -189,53 +135,31 @@ func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	// Criptografar senha
 	hash, err := HashPassword(ctx, p.Password)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("não foi possível criptografar senha")
+		return uuid.Nil, err
 	}
 
 	// Criação
-	_, rbErrors.DB = tx.Exec(
+	_, err = tx.Exec(
 		insert,
 		sql.Named("user_id", userId.String()),
 		sql.Named("name", p.Name),
 		sql.Named("password", hash),
 		sql.Named("updated_at", ts),
 	)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar usuário.", zap.Error(rbErrors.DB))
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar usuário.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar usuário")
 	}
 
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.User)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
-		return uuid.Nil, rbErrors.FS
-	}
-
 	// Confirmar a transação no banco
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
 	return userId, nil
 }
 
-// CreateCategory cria um registro de uma nova categoria no banco de dados e
-// configura um diretório correspondente no sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: ponteiro para o contexto da aplicação, contendo o banco de dados,
-//     sistema de arquivos e configurações.
-//   - p: estrutura CategParams com os dados necessários para criar a categoria
-//     (ex: nome, identificador do usuário).
-//
-// Retorno:
-//   - uuid.UUID: UUID da categoria criada.
-//   - error: retorna um erro caso alguma etapa do processo falhe, como falhas
-//     na transação ou erros na criação do diretório.
 func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
-	rbErrors := &RollbackErrors{}
-
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	categId, err := uuid.NewUUID()
@@ -243,23 +167,16 @@ func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
-	path := filepath.Join(ctx.FileSystem.Root, p.UserId.String(), categId.String())
 
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := CreateRollbackData{
-		Tx:             tx,
-		Path:           path,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackCreate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Insert query
 	schema := &ctx.Config.Database.Schema
@@ -276,50 +193,27 @@ func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
 	)
 
 	// Criação
-	_, rbErrors.DB = tx.Exec(
+	_, err = tx.Exec(
 		insert,
 		sql.Named("categ_id", categId.String()),
 		sql.Named("user_id", p.UserId.String()),
 		sql.Named("name", p.Name),
 		sql.Named("updated_at", ts),
 	)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar categoria.", zap.Error(rbErrors.DB))
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar categoria.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar categoria")
 	}
 
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.CreateEntity(path, nil, fs.Category)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao criar diretório.", zap.Error(rbErrors.FS))
-		return uuid.Nil, rbErrors.FS
-	}
-
 	// Confirmar a transação no banco
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
 	return categId, nil
 }
 
-// CreateFile cria um registro de um novo arquivo no banco de dados e
-// configura um diretório correspondente no sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: ponteiro para o contexto da aplicação, que contém o banco de dados,
-//     sistema de arquivos e as configurações da aplicação.
-//   - p: estrutura FileParams que contém os dados necessários para a criação do
-//     arquivo (ex: nome, extensão, conteúdo, identificador da categoria e do
-//     usuário).
-//
-// Retorno:
-//   - uuid.UUID: UUID do arquivo criado.
-//   - error: retorna um erro caso alguma etapa do processo falhe, seja no banco
-//     de dados ou no sistema de arquivos.
 func CreateFile(ctx *context.Context, p FileParams) (uuid.UUID, error) {
-	rbErrors := &RollbackErrors{}
-
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	fileId, err := uuid.NewUUID()
@@ -327,35 +221,26 @@ func CreateFile(ctx *context.Context, p FileParams) (uuid.UUID, error) {
 		ctx.Logger.Error("Erro ao criar UUID.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar UUID")
 	}
-	path := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.CategId.String(),
-		fileId.String()+p.Extension,
-	)
 
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := CreateRollbackData{
-		Tx:             tx,
-		Path:           path,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackCreate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
+
+	// Criação do BLOB
+	directLob := goora.Blob{Data: *p.Content}
 
 	// Insert query
 	schema := &ctx.Config.Database.Schema
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
-  		(%s, %s, %s, %s, %s, %s)
-		VALUES (:file_id, :categ_id, :name, :extension, :mimetype, :updated_at)`,
+  		(%s, %s, %s, %s, %s, %s, %s)
+		VALUES (:file_id, :categ_id, :name, :extension, :mimetype, :blob, :updated_at)`,
 		schema.Name,
 		schema.FileTable.Name,
 		schema.FileTable.Columns.FileId,
@@ -363,34 +248,29 @@ func CreateFile(ctx *context.Context, p FileParams) (uuid.UUID, error) {
 		schema.FileTable.Columns.Name,
 		schema.FileTable.Columns.Extension,
 		schema.FileTable.Columns.Mimetype,
+		schema.FileTable.Columns.Blob,
 		schema.FileTable.Columns.UpdatedAt,
 	)
 
 	// Criação
-	_, rbErrors.DB = tx.Exec(
+	_, err = tx.Exec(
 		insert,
 		sql.Named("file_id", fileId.String()),
 		sql.Named("categ_id", p.CategId.String()),
 		sql.Named("name", p.Name),
 		sql.Named("extension", p.Extension),
 		sql.Named("mimetype", p.Mimetype),
+		sql.Named("blob", directLob),
 		sql.Named("updated_at", ts),
 	)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar arquivo.", zap.Error(rbErrors.DB))
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar arquivo.", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível criar arquivo")
 	}
 
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.CreateEntity(path, p.Content, fs.File)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao criar arquivo em disco.", zap.Error(rbErrors.FS))
-		return uuid.Nil, rbErrors.FS
-	}
-
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return uuid.Nil, fmt.Errorf("não foi possível confirmar transação")
 	}
 	return fileId, nil
@@ -664,7 +544,7 @@ func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error)
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s,%s,%s,%s,%s,%s
+		`SELECT %s,%s,%s,%s,%s,%s,%s
 		FROM %s.%s
 		WHERE %s = :file_id`,
 		schema.FileTable.Columns.FileId,
@@ -672,6 +552,7 @@ func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error)
 		schema.FileTable.Columns.Name,
 		schema.FileTable.Columns.Extension,
 		schema.FileTable.Columns.Mimetype,
+		schema.FileTable.Columns.Blob,
 		schema.FileTable.Columns.UpdatedAt,
 		schema.Name,
 		schema.FileTable.Name,
@@ -679,6 +560,7 @@ func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error)
 	)
 
 	// Obtenção da linha
+	var directLob goora.Blob
 	row := ctx.DB.QueryRow(query, sql.Named("file_id", fileId.String()))
 	err := row.Scan(
 		&file.FileId,
@@ -686,64 +568,21 @@ func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error)
 		&file.Name,
 		&file.Extension,
 		&file.Mimetype,
+		&directLob,
 		&file.UpdatedAt,
 	)
 	if err != nil {
 		return file, fmt.Errorf("não foi possível obter arquivo")
 	}
+	file.Blob = directLob.Data
 	return file, nil
 }
 
-// rollbackUpdate tenta reverter uma atualização em caso de falha, restaurando o
-// estado anterior no banco de dados e no sistema de arquivos, caso necessário.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo configurações, conexão ao banco de
-//     dados e utilitários de log.
-//   - rbData: estrutura UpdateRollbackData com informações da transação a ser
-//     revertida, caminhos de arquivos (se aplicável) e erros de rollback.
-func rollbackUpdate(ctx *context.Context, rbData UpdateRollbackData) {
-	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
-		// Tentativas de rollback no banco
-		if rbData.DB != nil {
-			if err := rbData.Tx.Rollback(); err != nil {
-				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
-			}
-		}
-
-		// Tentativa de mover arquivo para o caminho original, caso tenha sido
-		// movido
-		if rbData.OldPath != "" && rbData.NewPath != "" && rbData.FS != nil {
-			err := ctx.FileSystem.UpdateEntity(rbData.NewPath, rbData.OldPath)
-			if err != nil {
-				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
-			}
-		}
-	}
-}
-
-// UpdateUser atualiza os dados de um usuário no banco e, opcionalmente, no
-// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
-// parâmetros inseridos são alterados.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação contendo configurações, conexão com o banco de
-//     dados e utilitários para log.
-//   - p: estrutura UserUpdate com os detalhes do usuário a ser atualizado,
-//     incluindo IDs, nomes (atual e novo), senha, entre outros.
-//
-// Retorno:
-//   - error: retorna um erro caso ocorra falha em qualquer etapa do processo,
-//     seja na inicialização ou confirmação da transação, ou na atualização no
-//     banco de dados.
-func UpdateUser(ctx *context.Context, p UserUpdate) error {
-	rbErrors := &RollbackErrors{}
-
+func UpdateUser(ctx *context.Context, userId uuid.UUID, p UserParams) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
@@ -751,25 +590,20 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 	ts := time.Now().Unix()
 
 	// Agendar rollback em caso de erro
-	rbData := UpdateRollbackData{
-		Tx:             tx,
-		OldPath:        "",
-		NewPath:        "",
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackUpdate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
 	var args []any
 	var set []string
-	if p.Name != p.OldName {
+	if p.Name != "" {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.UserTable.Columns.Name+" = :name")
 	}
 	if p.Password != "" {
 		// Criptografar senha
-		hash, err := HashPassword(ctx, p.Password)
+		var hash string
+		hash, err = HashPassword(ctx, p.Password)
 		if err != nil {
 			return fmt.Errorf("não foi possível criptografar senha")
 		}
@@ -788,82 +622,47 @@ func UpdateUser(ctx *context.Context, p UserUpdate) error {
 		strings.Join(set, ","),
 		schema.UserTable.Columns.UserId,
 	)
-	args = append(args, sql.Named("user_id", p.UserId.String()))
+	args = append(args, sql.Named("user_id", userId.String()))
 
 	// Atualização
-	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args...)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(rbErrors.DB))
+	res, err := tx.Exec(update, args...)
+	if err != nil {
+		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(err))
 		return fmt.Errorf("não foi possível atualizar usuário")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar usuário.", zap.Error(err))
+		return fmt.Errorf("não foi possível atualizar usuário")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
 	}
 	return nil
 }
 
-// UpdateCategory atualiza os dados de uma categoria no banco e, opcionalmente, no
-// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
-// parâmetros inseridos são alterados.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação contendo configurações, conexão com o banco de
-//     dados, utilitários de log e acesso ao sistema de arquivos.
-//   - p: estrutura CategUpdate com informações da categoria a ser atualizada,
-//     incluindo IDs, nomes (atual e novo) e usuários.
-//
-// Retorno:
-//   - error: retorna um erro caso ocorra falha em qualquer etapa, seja na
-//     inicialização ou confirmação da transação, execução da alteração no banco
-//     de dados ou atualização no sistema de arquivos.
-func UpdateCategory(ctx *context.Context, p CategUpdate) error {
-	rbErrors := &RollbackErrors{}
-
+func UpdateCategory(ctx *context.Context, categId uuid.UUID, p CategParams) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
-	// Geração do Timestamp e caminhos
+	// Geração do Timestamp
 	ts := time.Now().Unix()
-	oldPath := filepath.Join(
-		ctx.FileSystem.Root,
-		p.OldUserId.String(),
-		p.CategId.String(),
-	)
-	newPath := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.CategId.String(),
-	)
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
 	var args []any
 	var set []string
-	if oldPath != newPath {
-		if !ctx.FileSystem.EntityExists(filepath.Dir(newPath)) {
-			rbErrors.DB = fmt.Errorf(
-				"não pôde atualizar categoria: diretório do usuário %s não existe",
-				filepath.Dir(newPath),
-			)
-			return rbErrors.DB
-		}
+	if p.UserId != uuid.Nil {
 		args = append(args, sql.Named("user_id", p.UserId.String()))
 		set = append(set, schema.CategTable.Columns.UserId+" = :user_id")
 	}
-	if p.Name != p.OldName {
+	if p.Name != "" {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.CategTable.Columns.Name+" = :name")
 	}
@@ -871,13 +670,7 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 	set = append(set, schema.CategTable.Columns.UpdatedAt+" = :updated_at")
 
 	// Agendar rollback em caso de erro
-	rbData := UpdateRollbackData{
-		Tx:             tx,
-		OldPath:        oldPath,
-		NewPath:        newPath,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackUpdate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Update query
 	update := fmt.Sprintf(`UPDATE %s.%s
@@ -888,116 +681,68 @@ func UpdateCategory(ctx *context.Context, p CategUpdate) error {
 		strings.Join(set, ","),
 		schema.CategTable.Columns.CategId,
 	)
-	args = append(args, sql.Named("categ_id", p.CategId.String()))
+	args = append(args, sql.Named("categ_id", categId.String()))
 
 	// Atualização
-	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args...)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(rbErrors.DB))
+	res, err := tx.Exec(update, args...)
+	if err != nil {
+		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(err))
 		return fmt.Errorf("não foi possível atualizar categoria")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
-	}
-
-	// Transação no sistema de arquivos
-	if oldPath != newPath {
-		rbErrors.FS = ctx.FileSystem.UpdateEntity(oldPath, newPath)
-		if rbErrors.FS != nil {
-			return rbErrors.FS
-		}
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar categoria.", zap.Error(err))
+		return fmt.Errorf("não foi possível atualizar categoria")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
 	}
 	return nil
 }
 
-// UpdateFile atualiza os dados de um arquivo no banco e, opcionalmente, no
-// sistema de arquivos, garantindo consistência por meio de transações. Apenas os
-// parâmetros inseridos são alterados.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo configurações, conexão com o banco,
-//     sistema de arquivos e utilitários.
-//   - p: estrutura FileUpdate com os dados do arquivo a ser atualizado,
-//     incluindo ID, categoria, nome, extensão, mime type, entre outros.
-//
-// Retorno:
-//   - error: retorna erro se ocorrer falha durante a transação ou ao aplicar
-//     mudanças no banco, ou no sistema de arquivos.
-func UpdateFile(ctx *context.Context, p FileUpdate) error {
-	rbErrors := &RollbackErrors{}
-
+func UpdateFile(ctx *context.Context, fileId uuid.UUID, p FileParams) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
-	// Geração do Timestamp e caminhos
+	// Geração do Timestamp
 	ts := time.Now().Unix()
-	oldPath := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.OldCategId.String(),
-		p.FileId.String()+p.OldExtension,
-	)
-	newPath := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.CategId.String(),
-		p.FileId.String(),
-	)
 
 	// Checagem dos parâmetros a serem atualizados
 	schema := &ctx.Config.Database.Schema
 	var args []any
 	var set []string
-	if oldPath != newPath {
-		if !ctx.FileSystem.EntityExists(filepath.Dir(newPath)) {
-			rbErrors.DB = fmt.Errorf(
-				"não pôde atualizar arquivo: diretório %s a categoria não existe",
-				filepath.Dir(newPath),
-			)
-			return rbErrors.DB
-		}
+	if p.CategId != uuid.Nil {
 		args = append(args, sql.Named("categ_id", p.CategId.String()))
 		set = append(set, schema.FileTable.Columns.CategId+" = :categ_id")
 	}
-	if p.Name != p.OldName {
+	if p.Name != "" {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.FileTable.Columns.Name+" = :name")
 	}
-	if p.Extension != p.OldExtension {
+	if p.Extension != "" && p.Extension != "." {
 		args = append(args, sql.Named("extension", p.Extension))
 		set = append(set, schema.FileTable.Columns.Extension+" = :extension")
-		newPath = newPath + p.Extension
-	} else {
-		newPath = newPath + p.OldExtension
 	}
-	if p.Mimetype != p.OldMimetype {
+	if p.Mimetype != "" {
 		args = append(args, sql.Named("mimetype", p.Mimetype))
 		set = append(set, schema.FileTable.Columns.Mimetype+" = :mimetype")
+	}
+	if p.Content != nil {
+		directLob := goora.Blob{Data: *p.Content}
+		args = append(args, sql.Named("blob", directLob))
+		set = append(set, schema.FileTable.Columns.Blob+" = :blob")
 	}
 	args = append(args, sql.Named("updated_at", ts))
 	set = append(set, schema.CategTable.Columns.UpdatedAt+" = :updated_at")
 
 	// Agendar rollback em caso de erro
-	rbData := UpdateRollbackData{
-		Tx:             tx,
-		OldPath:        oldPath,
-		NewPath:        newPath,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackUpdate(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Update query
 	update := fmt.Sprintf(`UPDATE %s.%s
@@ -1008,121 +753,37 @@ func UpdateFile(ctx *context.Context, p FileUpdate) error {
 		strings.Join(set, ","),
 		schema.FileTable.Columns.FileId,
 	)
-	args = append(args, sql.Named("file_id", p.FileId.String()))
+	args = append(args, sql.Named("file_id", fileId.String()))
 
 	// Atualização
-	var res sql.Result
-	res, rbErrors.DB = tx.Exec(update, args...)
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(rbErrors.DB))
+	res, err := tx.Exec(update, args...)
+	if err != nil {
+		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(err))
 		return fmt.Errorf("não foi possível atualizar arquivo")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
-	}
-
-	// Transação no sistema de arquivos
-	if p.Content == nil && oldPath != newPath {
-		rbErrors.FS = ctx.FileSystem.UpdateEntity(oldPath, newPath)
-		if rbErrors.FS != nil {
-			return rbErrors.FS
-		}
-	} else if p.Content != nil {
-		rbErrors.FS = ctx.FileSystem.CreateEntity(newPath, p.Content, fs.File)
-		if rbErrors.FS != nil {
-			return rbErrors.FS
-		}
-		defer func(ctx *context.Context, rbData UpdateRollbackData) {
-			if rbData.FS != nil {
-				// Tentativa de exclusão do arquivo criado, caso tenha erros
-				err := ctx.FileSystem.DeleteEntity(rbData.NewPath)
-				if err != nil {
-					ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
-				}
-			} else {
-				// Tentativa de exclusão do arquivo antigo, quando não tiver erros
-				err := ctx.FileSystem.DeleteEntity(rbData.OldPath)
-				if err != nil {
-					ctx.Logger.Error("Tentativa de limpeza falhou", zap.Error(err))
-				}
-			}
-		}(ctx, rbData)
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao atualizar arquivo.", zap.Error(err))
+		return fmt.Errorf("não foi possível atualizar arquivo")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
 	}
 	return nil
 }
 
-// rollbackDelete realiza o rollback de uma transação de exclusão no banco de
-// dados e no sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo informações de configuração, banco
-//     de dados e sistema de arquivos.
-//   - rbData: estrutura DeleteRollbackData com os dados necessários para
-//     executar o rollback, como a transação, caminho do arquivo e erros.
-func rollbackDelete(ctx *context.Context, rbData DeleteRollbackData) {
-	if rbData.Tx != nil && (rbData.DB != nil || rbData.FS != nil) {
-		// Tentativas de rollback no banco
-		if rbData.DB != nil {
-			if err := rbData.Tx.Rollback(); err != nil {
-				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
-			}
-		}
-
-		// Tentativa de incluir o arquivo backup
-		if rbData.FS != nil {
-			err := ctx.FileSystem.CreateEntity(
-				rbData.Path,
-				rbData.Content,
-				rbData.Type,
-			)
-			if err != nil {
-				ctx.Logger.Error("Tentativa de rollback falhou", zap.Error(err))
-			}
-		}
-	}
-}
-
-// DeleteUser realiza a exclusão de um usuário no banco de dados e no sistema de
-// arquivos.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo informações de configuração, banco de
-//     dados e sistema de arquivos.
-//   - p: estrutura UserDelete que contém as informações do usuário a ser excluído.
-//
-// Retorno:
-//   - error: retorna um erro se ocorrer alguma falha durante o processo de
-//     exclusão.
-func DeleteUser(ctx *context.Context, p UserDelete) error {
-	rbErrors := &RollbackErrors{}
-
-	// Caminho
-	path := filepath.Join(ctx.FileSystem.Root, p.UserId.String())
-
+func DeleteUser(ctx *context.Context, userId uuid.UUID) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := DeleteRollbackData{
-		Tx:             tx,
-		Path:           path,
-		Type:           fs.User,
-		Content:        nil,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackDelete(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Delete query
 	schema := &ctx.Config.Database.Schema
@@ -1134,69 +795,34 @@ func DeleteUser(ctx *context.Context, p UserDelete) error {
 	)
 
 	// Exclusão
-	var res sql.Result
-	res, rbErrors.DB = tx.Exec(del, sql.Named("user_id", p.UserId.String()))
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(rbErrors.DB))
+	res, err := tx.Exec(del, sql.Named("user_id", userId.String()))
+	if err != nil {
+		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(err))
 		return fmt.Errorf("não foi possível excluir usuário")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir usuário.", zap.Error(err))
+		return fmt.Errorf("não foi possível excluir usuário")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
-	}
-
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao excluir diretório.", zap.Error(rbErrors.DB))
-		return rbErrors.FS
 	}
 	return nil
 }
 
-// DeleteCategory realiza a exclusão de uma categoria no banco de dados e no
-// sistema de arquivos.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo configurações, banco de dados e
-//     sistema de arquivos.
-//   - p: estrutura CategDelete com os dados necessários para a exclusão.
-//
-// Retorno:
-//   - error: retorna um erro se ocorrer falha durante o processo de exclusão.
-func DeleteCategory(ctx *context.Context, p CategDelete) error {
-	rbErrors := &RollbackErrors{}
-
-	// Caminho
-	path := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.CategId.String(),
-	)
-
+func DeleteCategory(ctx *context.Context, categId uuid.UUID) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := DeleteRollbackData{
-		Tx:             tx,
-		Path:           path,
-		Type:           fs.Category,
-		Content:        nil,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackDelete(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Delete query
 	schema := &ctx.Config.Database.Schema
@@ -1209,91 +835,34 @@ func DeleteCategory(ctx *context.Context, p CategDelete) error {
 
 	// Exclusão
 	var res sql.Result
-	res, rbErrors.DB = tx.Exec(del, sql.Named("categ_id", p.CategId.String()))
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(rbErrors.DB))
+	res, err = tx.Exec(del, sql.Named("categ_id", categId.String()))
+	if err != nil {
+		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(err))
 		return fmt.Errorf("não foi possível excluir categoria")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir categoria.", zap.Error(err))
+		return fmt.Errorf("não foi possível excluir categoria")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
-	}
-
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao excluir diretório.", zap.Error(rbErrors.DB))
-		return rbErrors.FS
 	}
 	return nil
 }
 
-// DeleteFile realiza a exclusão de um arquivo no banco de dados e no sistema
-// de arquivos.
-//
-// Parâmetros:
-//   - ctx: contexto da aplicação, contendo configurações, banco de dados e
-//     sistema de arquivos.
-//   - p: estrutura FileDelete com os dados necessários para a exclusão.
-//
-// Retorno:
-//   - error: retorna um erro se ocorrer falha durante o processo de exclusão.
-func DeleteFile(ctx *context.Context, p FileDelete) error {
-	rbErrors := &RollbackErrors{}
-
-	// Caminho
-	path := filepath.Join(
-		ctx.FileSystem.Root,
-		p.UserId.String(),
-		p.CategId.String(),
-		p.FileId.String()+p.Extension,
-	)
-
-	// Obter conteúdo do arquivo para backup
-	// Abrir arquivo
-	file, err := os.Open(path)
-	if err != nil {
-		ctx.Logger.Error("Erro ao abrir arquivo.", zap.Error(err))
-		rbErrors.FS = fmt.Errorf("erro ao abrir %s", path)
-		return rbErrors.FS
-	}
-	defer func(file *os.File) {
-		if err := file.Close(); err != nil {
-			ctx.Logger.Error("Erro ao fechar arquivo para leitura", zap.Error(err))
-		}
-	}(file)
-	// Leitura
-	var backupContent []byte
-	backupContent, rbErrors.FS = io.ReadAll(file)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao ler arquivo.", zap.Error(rbErrors.FS))
-		rbErrors.FS = fmt.Errorf("erro ao ler %s para backup", path)
-		return rbErrors.FS
-	}
-
+func DeleteFile(ctx *context.Context, fileId uuid.UUID) error {
 	// Iniciar uma transação
-	var tx *sql.Tx
-	tx, rbErrors.DB = ctx.DB.Begin()
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(rbErrors.DB))
+	tx, err := ctx.DB.Begin()
+	if err != nil {
+		ctx.Logger.Error("Erro ao criar transação de banco.", zap.Error(err))
 		return fmt.Errorf("erro ao iniciar transação")
 	}
 
 	// Agendar rollback em caso de erro
-	rbData := DeleteRollbackData{
-		Tx:             tx,
-		Path:           path,
-		Type:           fs.File,
-		Content:        &backupContent,
-		RollbackErrors: rbErrors,
-	}
-	defer rollbackDelete(ctx, rbData)
+	defer rollback(ctx, tx, &err)
 
 	// Delete query
 	schema := &ctx.Config.Database.Schema
@@ -1305,29 +874,20 @@ func DeleteFile(ctx *context.Context, p FileDelete) error {
 	)
 
 	// Exclusão
-	var res sql.Result
-	res, rbErrors.DB = tx.Exec(del, sql.Named("file_id", p.FileId.String()))
-	if rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(rbErrors.DB))
+	res, err := tx.Exec(del, sql.Named("file_id", fileId.String()))
+	if err != nil {
+		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(err))
 		return fmt.Errorf("não foi possível excluir arquivo")
 	} else if n, _ := res.RowsAffected(); n > 1 {
-		rbErrors.DB = fmt.Errorf("mais de uma linha afetada")
-		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(rbErrors.DB))
-		return rbErrors.DB
+		err = fmt.Errorf("mais de uma linha afetada")
+		ctx.Logger.Error("Erro ao excluir arquivo.", zap.Error(err))
+		return fmt.Errorf("não foi possível excluir arquivo")
 	}
 
 	// Confirmar a transação
-	if rbErrors.DB = tx.Commit(); rbErrors.DB != nil {
-		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(rbErrors.DB))
+	if err = tx.Commit(); err != nil {
+		ctx.Logger.Error("Erro ao efetivar transação (COMMIT).", zap.Error(err))
 		return fmt.Errorf("erro ao confirmar transação")
 	}
-
-	// Transação no sistema de arquivos
-	rbErrors.FS = ctx.FileSystem.DeleteEntity(path)
-	if rbErrors.FS != nil {
-		ctx.Logger.Error("Erro ao excluir arquivo em disco.", zap.Error(rbErrors.DB))
-		return rbErrors.FS
-	}
-
 	return nil
 }

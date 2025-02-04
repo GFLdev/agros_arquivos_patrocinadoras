@@ -7,7 +7,6 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/config"
 	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
-	"agros_arquivos_patrocinadoras/pkg/app/fs"
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"database/sql"
 	"fmt"
@@ -19,10 +18,6 @@ import (
 	"strings"
 	"syscall"
 )
-
-// FsRoot define o nome do diretório raíz usado para operações no sistema de
-// arquivos.
-const FsRoot = "data"
 
 // Serve é responsável por iniciar o servidor HTTP da aplicação.
 //
@@ -85,11 +80,6 @@ func init() {
 	if err := os.MkdirAll("logs", os.ModePerm); err != nil {
 		panic(err)
 	}
-
-	// Criação da pasta com os arquivos, caso não exista
-	if err := os.MkdirAll(FsRoot, os.ModePerm); err != nil {
-		panic(err)
-	}
 }
 
 func main() {
@@ -100,11 +90,6 @@ func main() {
 
 	// Configurações
 	cfg := config.LoadConfig(logr)
-
-	// Sistema de arquivos
-	filesystem := &fs.FileSystem{
-		Root: FsRoot,
-	}
 
 	// Banco de dados
 	dataBase := db.GetSqlDB(&cfg.Database, logr)
@@ -117,10 +102,9 @@ func main() {
 
 	// Contexto da aplicação
 	ctx := &context.Context{
-		Logger:     logr,
-		Config:     cfg,
-		FileSystem: filesystem,
-		DB:         dataBase,
+		Logger: logr,
+		Config: cfg,
+		DB:     dataBase,
 	}
 
 	// Servidor Echo
