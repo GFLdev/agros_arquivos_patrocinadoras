@@ -86,6 +86,11 @@ func main() {
 	// Logger
 	logr := logger.CreateLogger()
 
+	// Handler para SIGINT (^C)
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt)
+	go handleSIGINT(c, logr)
+
 	logr.Info("Iniciando aplicação")
 
 	// Configurações
@@ -115,11 +120,6 @@ func main() {
 
 	// Rotas
 	ConfigRoutes(e, ctx)
-
-	// Handler para SIGINT (^C)
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
-	go handleSIGINT(c, logr)
 
 	// Inicializar servidor
 	Serve(e, ctx)

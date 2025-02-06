@@ -116,10 +116,13 @@ func CreateCategoryHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Parâmetros da URL
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
+	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
 	}
 
 	// Criar categoria
@@ -157,14 +160,22 @@ func CreateFileHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Parâmetros da URL
-	_, err = ParseEntityUUID(c, User)
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
+	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
 	}
 
 	// Criar arquivo
@@ -215,7 +226,8 @@ func GetAllUsers(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     seja bem-sucedido.
 func GetUserById(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
@@ -224,13 +236,12 @@ func GetUserById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
 
-	// Obtenção do contexto da aplicação e do usuário
-	ctx := context.GetContext(c)
-	res, err := app.QueryUserById(ctx, userId)
+	// Obtenção do usuário
+	user, err := app.QueryUserById(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, user)
 }
 
 // GetAllCategories obtém todas as categorias presentes no repositório.
@@ -242,7 +253,8 @@ func GetUserById(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso a listagem
 //     das categorias seja bem-sucedida.
 func GetAllCategories(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
@@ -250,14 +262,16 @@ func GetAllCategories(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
 
-	// Obtenção do contexto da aplicação e de todas as categorias
-	ctx := context.GetContext(c)
-	res, err := app.QueryAllCategories(ctx, userId)
+	// Obtenção de todas as categorias
+	categs, err := app.QueryAllCategories(ctx, userId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, CategoriesNotFoundMessage)
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, categs)
 }
 
 // GetCategoryById obtém uma categoria específica com base em seu identificador
@@ -270,26 +284,30 @@ func GetAllCategories(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     seja bem-sucedido.
 func GetCategoryById(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
 
-	// Obtenção do contexto da aplicação e da categoria
-	ctx := context.GetContext(c)
-	res, err := app.QueryCategoryById(ctx, categId)
+	// Obtenção da categoria
+	categ, err := app.QueryCategoryById(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, categ)
 }
 
 // GetAllFiles obtém todos os arquivos presentes no repositório.
@@ -301,26 +319,34 @@ func GetCategoryById(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso a listagem
 //     dos arquivos seja bem-sucedida.
 func GetAllFiles(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, User)
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
 
-	// Obtenção do contexto da aplicação e de todos os arquivos
-	ctx := context.GetContext(c)
-	res, err := app.QueryAllFiles(ctx, categId)
+	// Obtenção de todos os arquivos
+	files, err := app.QueryAllFiles(ctx, categId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, FilesNotFoundMessage)
 	}
-	return c.JSON(http.StatusOK, res)
+	return c.JSON(http.StatusOK, files)
 }
 
 // GetFileById obtém um arquivo específico com base em seu identificador único.
@@ -332,25 +358,33 @@ func GetAllFiles(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     seja bem-sucedido.
 func GetFileById(c echo.Context) error {
-	// Cabeçalho
-	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 
-	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, User)
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	_, err = ParseEntityUUID(c, Category)
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
+
 	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
 
-	// Obtenção do contexto da aplicação e dos dados do arquivo
-	ctx := context.GetContext(c)
+	// Obtenção dos dados do arquivo
 	file, err := app.QueryFileById(ctx, fileId)
 	if err != nil {
 		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
@@ -378,21 +412,26 @@ func UpdateUserHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Parâmetros da URL
+	// Caso nada seja requisitado para alterar
+	if body.Name == "" && body.Password == "" {
+		return c.JSON(http.StatusBadRequest, BadRequestMessage)
+	}
+
+	// Parâmetros da URL e verificar se usuário existe
 	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
 
 	// Validar senha e alteração
-	if len(body.Password) < 4 {
-		return c.JSON(http.StatusBadRequest, BadRequestMessage)
+	if body.Password != "" && len(body.Password) < 4 {
+		return c.JSON(http.StatusBadRequest, InvalidPasswordMessage)
 	}
-	user := app.UserParams{
-		Name:     body.Name,
-		Password: body.Password,
-	}
-	if err = app.UpdateUser(ctx, userId, user); err != nil {
+	userParams := app.UserParams{Name: body.Name, Password: body.Password}
+	if err = app.UpdateUser(ctx, userId, userParams); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, UpdatedUserMessage)
@@ -418,22 +457,44 @@ func UpdateCategoryHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Parâmetros da URL
-	_, err = ParseEntityUUID(c, User)
+	// Caso nada seja requisitado para alterar
+	if body.UserId == "" && body.Name == "" {
+		return c.JSON(http.StatusBadRequest, BadRequestMessage)
+	}
+
+	// Transformar UserId para atualização e verificar existência
+	parsedUserId := uuid.Nil
+	if body.UserId != "" {
+		parsedUserId, err = uuid.Parse(body.UserId)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
+		}
+		if _, err = app.QueryUserById(ctx, parsedUserId); err != nil {
+			return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+		}
+	}
+
+	// Parâmetros da URL e verificar se usuário e categoria existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
 
 	// Alteração
-	categ := app.CategParams{
-		UserId: body.UserId,
-		Name:   body.Name,
-	}
-	if err = app.UpdateCategory(ctx, categId, categ); err != nil {
+	categParams := app.CategParams{UserId: parsedUserId, Name: body.Name}
+	if err = app.UpdateCategory(ctx, categId, categParams); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, UpdatedCategoryMessage)
@@ -458,29 +519,60 @@ func UpdateFileHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Parâmetros da URL
-	_, err = ParseEntityUUID(c, User)
+	// Caso nada seja requisitado para alterar
+	if body.CategId == "" && body.Name == "" && body.Extension == "" &&
+		body.Mimetype == "" && len(body.Content) == 0 {
+		return c.JSON(http.StatusBadRequest, BadRequestMessage)
+	}
+
+	// Transformar CategId para atualização e verificar existência
+	parsedCategId := uuid.Nil
+	if body.CategId != "" {
+		parsedCategId, err = uuid.Parse(body.CategId)
+		if err != nil {
+			return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
+		}
+		if _, err = app.QueryCategoryById(ctx, parsedCategId); err != nil {
+			return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+		}
+	}
+
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	_, err = ParseEntityUUID(c, Category)
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
+
 	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
+	file, err := app.QueryFileById(ctx, fileId)
+	if err != nil && file.CategId != categId.String() {
+		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
+	}
 
 	// Alteração
-	file := app.FileParams{
-		CategId:   body.CategId,
+	fileParams := app.FileParams{
+		CategId:   parsedCategId,
 		Name:      body.Name,
 		Extension: body.Extension,
 		Mimetype:  body.Mimetype,
 		Content:   &body.Content,
 	}
-	if err = app.UpdateFile(ctx, fileId, file); err != nil {
+	if err = app.UpdateFile(ctx, fileId, fileParams); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
 	return c.JSON(http.StatusOK, UpdatedFileMessage)
@@ -495,17 +587,20 @@ func UpdateFileHandler(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     de exclusão seja bem-sucedido.
 func DeleteUser(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	// Parâmetros da URL
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
 
-	// Obtenção do contexto da aplicação e remoção do usuário
-	ctx := context.GetContext(c)
+	// Remoção do usuário
 	if err = app.DeleteUser(ctx, userId); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
@@ -521,21 +616,29 @@ func DeleteUser(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     de exclusão seja bem-sucedido.
 func DeleteCategory(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, User)
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
 
-	// Obtenção do contexto da aplicação e remoção da categoria
-	ctx := context.GetContext(c)
+	// Remoção da categoria
 	if err = app.DeleteCategory(ctx, categId); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
@@ -551,25 +654,36 @@ func DeleteCategory(c echo.Context) error {
 //   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
 //     de exclusão seja bem-sucedido.
 func DeleteFile(c echo.Context) error {
-	// Cabeçalho
+	// Cabeçalho e contexto da aplicação
+	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
-	// Parâmetros da URL
-	_, err := ParseEntityUUID(c, User)
+	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
+	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
 	}
-	_, err = ParseEntityUUID(c, Category)
+	if _, err = app.QueryUserById(ctx, userId); err != nil {
+		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
+	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
 	}
+	categ, err := app.QueryCategoryById(ctx, categId)
+	if err != nil && categ.UserId != userId.String() {
+		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
+
 	fileId, err := ParseEntityUUID(c, File)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
-
-	// Obtenção do contexto da aplicação e dos dados do arquivo
-	ctx := context.GetContext(c)
+	file, err := app.QueryFileById(ctx, fileId)
+	if err != nil && file.CategId != categId.String() {
+		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
+	}
 
 	// Remoção do arquivo
 	if err = app.DeleteFile(ctx, fileId); err != nil {

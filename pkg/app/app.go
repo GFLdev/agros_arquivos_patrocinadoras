@@ -442,6 +442,7 @@ func QueryAllFiles(ctx *context.Context, categId uuid.UUID) ([]db.FileModel, err
 			ctx.Logger.Error("Erro ao obter arquivo.", zap.Error(err))
 			return files, fmt.Errorf("não foi possível obter todas os arquivos")
 		}
+		f.Blob = nil
 		files = append(files, f)
 	}
 
@@ -733,7 +734,7 @@ func UpdateFile(ctx *context.Context, fileId uuid.UUID, p FileParams) error {
 		args = append(args, sql.Named("mimetype", p.Mimetype))
 		set = append(set, schema.FileTable.Columns.Mimetype+" = :mimetype")
 	}
-	if p.Content != nil {
+	if p.Content != nil && len(*p.Content) > 0 {
 		directLob := goora.Blob{Data: *p.Content}
 		args = append(args, sql.Named("blob", directLob))
 		set = append(set, schema.FileTable.Columns.Blob+" = :blob")

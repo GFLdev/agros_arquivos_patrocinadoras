@@ -5,6 +5,7 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
+	"database/sql"
 	"fmt"
 	"os"
 	"testing"
@@ -27,13 +28,17 @@ func TestMain(m *testing.M) {
 
 	// Cleanup e finalização
 	ctx := newContext()
+	defer func(DB *sql.DB) {
+		_ = DB.Close()
+	}(ctx.DB)
 
 	// Apagar dados do banco
 	schema := ctx.Config.Database.Schema
 	delUsers := fmt.Sprintf(
-		"DELETE FROM %s.%s WHERE 0 = 0",
+		"DELETE FROM %s.%s WHERE %s <> :adminName",
 		schema.Name,
 		schema.UserTable.Name,
+		schema.UserTable.Columns.Name,
 	)
 	delCategories := fmt.Sprintf(
 		"DELETE FROM %s.%s WHERE 0 = 0",
@@ -52,7 +57,7 @@ func TestMain(m *testing.M) {
 	}
 	_, _ = tx.Exec(delFiles)
 	_, _ = tx.Exec(delCategories)
-	_, _ = tx.Exec(delUsers)
+	_, _ = tx.Exec(delUsers, sql.Named("adminName", ctx.Config.AdminName))
 	_ = tx.Commit()
 
 	// Finaliza os testes

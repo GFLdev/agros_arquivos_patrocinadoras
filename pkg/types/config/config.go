@@ -10,6 +10,8 @@ type Config struct {
 	Environment string `json:"environment" validate:"required"`
 	// Origins contém a lista de origens permitidas para acessar os recursos.
 	Origins []string `json:"origins" validate:"required"`
+	// AdminName especifica o nome do usuário administrador no banco.
+	AdminName string `json:"admin_name" validate:"required"`
 	// Port define a porta onde o servidor da aplicação será executado.
 	Port int `json:"port" validate:"required"`
 	// Database armazena as configurações de conexão e esquema do banco de dados.

@@ -51,31 +51,31 @@ type CreateFileReq struct {
 // UpdateUserReq representa os dados necessários para atualizar um usuário.
 type UpdateUserReq struct {
 	// Name especifica o novo nome do usuário.
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name"`
 	// Password especifica a nova senha do usuário.
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password"`
 }
 
 // UpdateCategoryReq representa os dados necessários para atualizar uma categoria.
 type UpdateCategoryReq struct {
 	// UserId especifica o ID do usuário proprietário da categoria.
-	UserId uuid.UUID `json:"userId" validate:"required"`
+	UserId string `json:"userId"`
 	// Name especifica o novo nome da categoria.
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name"`
 }
 
 // UpdateFileReq representa os dados necessários para atualizar um arquivo.
 type UpdateFileReq struct {
 	// CategId especifica o ID da categoria associada ao arquivo.
-	CategId uuid.UUID `json:"categId" validate:"required"`
+	CategId string `json:"categId"`
 	// Name especifica o novo nome do arquivo.
-	Name string `json:"name" validate:"required"`
+	Name string `json:"name"`
 	// Extension especifica a nova extensão do arquivo.
-	Extension string `json:"extension" validate:"required"`
+	Extension string `json:"extension"`
 	// Mimetype especifica o novo tipo MIME do arquivo.
-	Mimetype string `json:"mimetype" validate:"required"`
+	Mimetype string `json:"mimetype"`
 	// Content especifica o novo conteúdo do arquivo.
-	Content []byte `json:"content" validate:"required"`
+	Content []byte `json:"content"`
 }
 
 // CreateResponse representa a resposta retornada após uma operação de criação
