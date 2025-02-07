@@ -7,14 +7,21 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"database/sql"
 	"fmt"
+	"go.uber.org/zap"
 	"os"
 	"testing"
 )
 
 func newContext() *context.Context {
 	logr := logger.CreateLogger()
-	cfg := config.LoadConfig(logr)
-	dataBase := db.GetSqlDB(&cfg.Database, logr)
+	cfg, err := config.LoadConfig(logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar configurações", zap.Error(err))
+	}
+	dataBase, err := db.GetSqlDB(&cfg.Database, logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar banco de dados", zap.Error(err))
+	}
 	return &context.Context{
 		Logger: logr,
 		Config: cfg,

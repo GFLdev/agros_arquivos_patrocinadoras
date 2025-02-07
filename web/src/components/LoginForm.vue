@@ -21,7 +21,7 @@ async function handleSignIn(): Promise<void> {
   loading.value = true
 
   const body: LoginRequest = {
-    username: username.value,
+    name: username.value,
     password: passwd.value,
   }
 
@@ -30,8 +30,6 @@ async function handleSignIn(): Promise<void> {
     headers: {
       Accept: 'application/json',
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type',
     },
     body: JSON.stringify(body),
   })

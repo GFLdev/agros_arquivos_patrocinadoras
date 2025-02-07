@@ -143,10 +143,16 @@ func main() {
 	logr.Info("Iniciando aplicação - Repor senha de administrador")
 
 	// Configurações
-	cfg := config.LoadConfig(logr)
+	cfg, err := config.LoadConfig(logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar configurações", zap.Error(err))
+	}
 
 	// Banco de dados
-	dataBase := db.GetSqlDB(&cfg.Database, logr)
+	dataBase, err := db.GetSqlDB(&cfg.Database, logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar banco de dados", zap.Error(err))
+	}
 	defer func(dataBase *sql.DB) {
 		err := dataBase.Close()
 		if err != nil {

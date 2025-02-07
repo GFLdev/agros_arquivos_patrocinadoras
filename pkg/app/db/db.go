@@ -22,7 +22,7 @@ import (
 //
 // Observação: O programa é encerrado com uma mensagem de erro fatal caso falhe
 // ao estabelecer ou testar a conexão.
-func GetSqlDB(dbParams *config.Database, logr *zap.Logger) *sql.DB {
+func GetSqlDB(dbParams *config.Database, logr *zap.Logger) (*sql.DB, error) {
 	// String de conexão
 	connString := fmt.Sprintf(
 		"oracle://%s:%s@%s:%s/%s",
@@ -37,14 +37,14 @@ func GetSqlDB(dbParams *config.Database, logr *zap.Logger) *sql.DB {
 	logr.Info("Conectando ao banco de dados")
 	db, err := sql.Open("oracle", connString)
 	if err != nil {
-		logr.Fatal("Erro ao conectar ao banco de dados", zap.Error(err))
+		return nil, fmt.Errorf("erro ao conectar ao banco de dados: %w", err)
 	}
 
 	// Testar conexão
 	logr.Info("Testando conexão ao banco de dados")
 	if err = db.Ping(); err != nil {
-		logr.Fatal("Erro ao testar a conexão ao banco de dados", zap.Error(err))
+		return nil, fmt.Errorf("erro ao testar a conexão ao banco de dados: %w", err)
 	}
 	logr.Info("Banco de dados conectado com sucesso")
-	return db
+	return db, nil
 }

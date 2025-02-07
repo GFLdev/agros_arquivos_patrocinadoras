@@ -10,6 +10,7 @@ package config
 import (
 	"agros_arquivos_patrocinadoras/pkg/types/config"
 	"encoding/json"
+	"fmt"
 	"go.uber.org/zap"
 	"io"
 	"os"
@@ -26,28 +27,29 @@ const CfgFile = "config.json"
 //
 // Retorno:
 //   - *config.Config: ponteiro para a estrutura de configuração carregada.
-func LoadConfig(logr *zap.Logger) *config.Config {
+//   - error: erro caso tenha acontecido algum erro no carregamento.
+func LoadConfig(logr *zap.Logger) (*config.Config, error) {
 	logr.Info("Carregando arquivo de configurações")
 
 	// Abertura do arquivo de configuração
 	file, err := os.Open(CfgFile)
 	if err != nil {
-		logr.Fatal("Não foi possível abrir arquivo de configuração", zap.Error(err))
+		return nil, fmt.Errorf("não foi possível abrir arquivo de configuração: %w", err)
 	}
 	defer func(file *os.File) {
 		if err := file.Close(); err != nil {
-			logr.Fatal("Não foi possível fechar arquivo de configuração", zap.Error(err))
+			logr.Error("Não foi possível fechar arquivo de configuração", zap.Error(err))
 		}
 	}(file)
 
 	// Leitura do arquivo e desagrupamento do JSON
 	jsonPayload, err := io.ReadAll(file)
 	if err != nil {
-		logr.Fatal("Não foi possível ler arquivo de configuração", zap.Error(err))
+		return nil, fmt.Errorf("não foi possível ler arquivo de configuração: %w", err)
 	}
 	cfg := &config.Config{}
 	if err = json.Unmarshal(jsonPayload, cfg); err != nil {
-		logr.Fatal("Não foi possível desagrupar dados de configuração", zap.Error(err))
+		return nil, fmt.Errorf("não foi possível desagrupar dados de configuração: %w", err)
 	}
 
 	// Logging
@@ -60,5 +62,5 @@ func LoadConfig(logr *zap.Logger) *config.Config {
 		cfg.Environment = "development"
 	}
 
-	return cfg
+	return cfg, nil
 }

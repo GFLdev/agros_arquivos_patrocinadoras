@@ -4,6 +4,7 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/handlers"
 	"github.com/labstack/echo/v4"
+	"net/http"
 )
 
 // ConfigRoutes define as rotas da aplicação utilizando o framework Echo.
@@ -37,4 +38,9 @@ func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	e.GET("/user/:userId/category/:categId/file/:fileId", handlers.GetFileById)
 	e.PATCH("/user/:userId/category/:categId/file/:fileId", handlers.UpdateFileHandler)
 	e.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFile)
+
+	// Preflight: rota coringa
+	e.OPTIONS("/*", func(c echo.Context) error {
+		return c.NoContent(http.StatusOK)
+	})
 }

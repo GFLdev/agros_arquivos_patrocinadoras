@@ -43,10 +43,8 @@ func Serve(e *echo.Echo, ctx *context.Context) {
 		err = fmt.Errorf("erro na configuração de ambiente")
 	}
 
-	if err != nil {
-		ctx.Logger.Fatal("Erro na execução do servidor",
-			zap.Error(err),
-		)
+	if err != nil && err.Error() != "http: Server closed" {
+		ctx.Logger.Fatal("Erro na execução do servidor", zap.Error(err))
 	}
 }
 
@@ -94,10 +92,16 @@ func main() {
 	logr.Info("Iniciando aplicação")
 
 	// Configurações
-	cfg := config.LoadConfig(logr)
+	cfg, err := config.LoadConfig(logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar configurações", zap.Error(err))
+	}
 
 	// Banco de dados
-	dataBase := db.GetSqlDB(&cfg.Database, logr)
+	dataBase, err := db.GetSqlDB(&cfg.Database, logr)
+	if err != nil {
+		logr.Fatal("Erro ao carregar banco de dados", zap.Error(err))
+	}
 	defer func(dataBase *sql.DB) {
 		err := dataBase.Close()
 		if err != nil {
@@ -112,15 +116,39 @@ func main() {
 		DB:     dataBase,
 	}
 
-	// Servidor Echo
-	e := echo.New()
-	e.HideBanner = true
-	e.IPExtractor = echo.ExtractIPFromXFFHeader()
-	ConfigMiddleware(e, ctx)
+	// Canal para reiniciar o servidor
+	restartChan := make(chan bool)
 
-	// Rotas
-	ConfigRoutes(e, ctx)
+	// Watcher de mudanças nas configurações
+	watcher := GetConfigWatcher(ctx, restartChan)
+	WatchConfigFile(ctx, watcher)
+	defer CloseConfigWatcher(ctx, watcher)
 
-	// Inicializar servidor
-	Serve(e, ctx)
+	// Goroutine para gerenciar o servidor
+	go func() {
+		for {
+			e := echo.New()
+			e.HideBanner = true
+			e.IPExtractor = echo.ExtractIPFromXFFHeader()
+			ConfigMiddleware(e, ctx)
+			ConfigRoutes(e, ctx)
+
+			// Inicia o servidor em uma goroutine separada
+			go func() {
+				Serve(e, ctx)
+			}()
+
+			// Aguarda um sinal para reiniciar o servidor
+			<-restartChan
+			logr.Warn("Reiniciando o servidor")
+
+			// Faz shutdown do servidor atual
+			if err = e.Shutdown(nil); err != nil {
+				logr.Error("Erro ao encerrar servidor", zap.Error(err))
+			}
+		}
+	}()
+
+	// Bloqueia main para não encerrar o programa
+	select {}
 }
