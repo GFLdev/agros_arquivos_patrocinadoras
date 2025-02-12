@@ -16,15 +16,25 @@ const (
 
 // LoginReq representa os dados necessários para autenticação de um usuário.
 type LoginReq struct {
-	// Name especifica o nome de usuário para autenticação.
-	Name string `json:"name" validate:"required"`
+	// Username especifica o nome de usuário para autenticação.
+	Username string `json:"username" validate:"required;"`
 	// Password especifica a senha para autenticação.
 	Password string `json:"password" validate:"required"`
 }
 
+type LoginRes struct {
+	Token   string      `json:"token"`
+	Message HTTPMessage `json:"message"`
+	Id      string      `json:"id"`
+	Name    string      `json:"name"`
+	Admin   bool        `json:"admin"`
+}
+
 // CreateUserReq representa os dados necessários para criar um novo usuário.
 type CreateUserReq struct {
-	// Name especifica o nome do novo usuário.
+	// Username especifica o nome de usuário, do novo usuário.
+	Username string `json:"username" validate:"required"`
+	// Name especifica o nome de apresentação do novo usuário.
 	Name string `json:"name" validate:"required"`
 	// Password especifica a senha do novo usuário.
 	Password string `json:"password" validate:"required"`
@@ -50,7 +60,9 @@ type CreateFileReq struct {
 
 // UpdateUserReq representa os dados necessários para atualizar um usuário.
 type UpdateUserReq struct {
-	// Name especifica o novo nome do usuário.
+	// Username especifica o novo nome de usuário.
+	Username string `json:"username"`
+	// Name especifica o novo nome de apresentação do usuário.
 	Name string `json:"name"`
 	// Password especifica a nova senha do usuário.
 	Password string `json:"password"`

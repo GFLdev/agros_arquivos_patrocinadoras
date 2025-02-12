@@ -2,11 +2,8 @@ package main
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
-	"agros_arquivos_patrocinadoras/pkg/auth"
 	"agros_arquivos_patrocinadoras/pkg/handlers"
-	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
+	"encoding/json"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
@@ -21,60 +18,6 @@ func ContextMiddleware(ctx *context.Context) echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			c.Set("appContext", ctx)
-			return next(c)
-		}
-	}
-}
-
-func AuthenticationMiddleware() echo.MiddlewareFunc {
-	return func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			// FIXME: Ignorar rota [POST] /login
-			if c.Path() != "/" {
-				return next(c)
-			}
-
-			// Obter o token JWT do cabeçalho
-			authHeader := c.Request().Header.Get(echo.HeaderAuthorization)
-			if authHeader == "" || len(authHeader) < 8 || authHeader[:7] != "Bearer " {
-				return echo.NewHTTPError(http.StatusUnauthorized, handlers.UnauthorizedMessage)
-			}
-			tokenString := authHeader[7:]
-
-			// Obter o contexto da aplicação para acessar a chave secreta
-			ctx := context.GetContext(c)
-
-			// Validar e analisar o token
-			token, err := jwt.ParseWithClaims(
-				tokenString,
-				&auth.CustomClaims{},
-				func(token *jwt.Token) (interface{}, error) {
-					if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-						return nil, fmt.Errorf("método de assinatura inesperado: %v", token.Header["alg"])
-					}
-					return []byte(ctx.Config.JwtSecret), nil
-				},
-			)
-			if err != nil || !token.Valid {
-				ctx.Logger.Error("Token inválido.", zap.Error(err))
-				return echo.NewHTTPError(http.StatusUnauthorized, handlers.UnauthorizedMessage)
-			}
-
-			// Obter claims
-			claims, ok := token.Claims.(*auth.CustomClaims)
-			if !ok || claims == nil || claims.Id == uuid.Nil {
-				return echo.NewHTTPError(http.StatusUnauthorized, handlers.UnauthorizedMessage)
-			}
-
-			// Adicionar informações do usuário ao contexto
-			user := echo.Map{
-				"userId": claims.Id,
-				"name":   claims.Name,
-				"admin":  claims.Admin,
-			}
-			c.Set("user", user)
-
-			// Continuar para próximo handler
 			return next(c)
 		}
 	}
@@ -96,6 +39,7 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 			echo.OPTIONS,
 		},
 		AllowHeaders: []string{
+			echo.HeaderAuthorization,
 			echo.HeaderOrigin,
 			echo.HeaderContentType,
 			echo.HeaderAccept,
@@ -110,13 +54,35 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 		ContextMiddleware(ctx),
 		// Middleware para capturar requisições e respostas
 		middleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
+			// Filtrar quaisquer senhas para não aparecer nos logs
+			filtered := make([][]byte, 2)
+			bodies := [][]byte{reqBody, resBody}
+			for j, body := range bodies {
+				var i interface{}
+				if err := json.Unmarshal(body, &i); err != nil {
+					filtered[j] = []byte("")
+				}
+
+				if m, ok := i.(map[string]interface{}); ok {
+					delete(m, "password")
+				} else {
+					filtered[j] = []byte("")
+				}
+
+				if payload, err := json.Marshal(i); err == nil {
+					filtered[j] = payload
+				} else {
+					filtered[j] = []byte("")
+				}
+			}
+
 			handlers.LogHTTPDetails(
 				c,
 				zapcore.InfoLevel,
 				"HTTP request-response",
 				zap.Int("status", c.Response().Status),
-				zap.String("request_body", string(reqBody)),
-				zap.String("response_body", string(resBody)),
+				zap.String("request_body", string(filtered[0])),
+				zap.String("response_body", string(filtered[1])),
 			)
 		}),
 		// Limitações de requisições IP/segundo
@@ -135,8 +101,6 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 		middleware.Recover(),
 		// CORS
 		middleware.CORSWithConfig(corsConfig),
-		// Autenticação
-		AuthenticationMiddleware(),
 		// Sistema de arquivos estáticos
 		middleware.StaticWithConfig(middleware.StaticConfig{
 			Filesystem: http.Dir("frontend/dist"),

@@ -16,20 +16,20 @@ import (
 	"time"
 )
 
-func getAdmin(ctx *context.Context, name string) (uuid.UUID, error) {
+func getAdmin(ctx *context.Context, username string) (uuid.UUID, error) {
 	// Verificar se usuário de administrador está no banco
 	schema := ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s FROM %s.%s WHERE %s = :name`,
+		`SELECT %s FROM %s.%s WHERE %s = :username`,
 		schema.UserTable.Columns.UserId,
 		schema.Name,
 		schema.UserTable.Name,
-		schema.UserTable.Columns.Name,
+		schema.UserTable.Columns.Username,
 	)
 
 	// Obtenção da linha
 	var userId uuid.UUID
-	row := ctx.DB.QueryRow(query, sql.Named("name", name))
+	row := ctx.DB.QueryRow(query, sql.Named("username", username))
 	err := row.Scan(&userId)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return uuid.Nil, fmt.Errorf("não existe o usuário administrador")
@@ -40,7 +40,7 @@ func getAdmin(ctx *context.Context, name string) (uuid.UUID, error) {
 	return userId, nil
 }
 
-func resetPassword(ctx *context.Context, name, password string) error {
+func resetPassword(ctx *context.Context, username, password string) error {
 	var successMsg string
 	schema := ctx.Config.Database.Schema
 	tx, err := ctx.DB.Begin()
@@ -66,17 +66,18 @@ func resetPassword(ctx *context.Context, name, password string) error {
 	ts := time.Now().Unix()
 
 	// Verifica se há o usuário como administrador
-	adminId, err := getAdmin(ctx, name)
+	adminId, err := getAdmin(ctx, username)
 	if err != nil {
-		ctx.Logger.Info("Administrador '" + name + "' não foi encontrado. Fazendo o cadastro.")
-		successMsg = "Administrador '" + name + "' foi criado com sucesso."
+		ctx.Logger.Info("Administrador '" + username + "' não foi encontrado. Fazendo o cadastro.")
+		successMsg = "Administrador '" + username + "' foi criado com sucesso."
 		adminId = uuid.New()
 		insert := fmt.Sprintf(
-			`INSERT INTO %s.%s (%s, %s, %s, %s)
-			VALUES (:user_id, :name, :password, :updated_at)`,
+			`INSERT INTO %s.%s (%s, %s, %s, %s, %s)
+			VALUES (:user_id, :username, :name, :password, :updated_at)`,
 			schema.Name,
 			schema.UserTable.Name,
 			schema.UserTable.Columns.UserId,
+			schema.UserTable.Columns.Username,
 			schema.UserTable.Columns.Name,
 			schema.UserTable.Columns.Password,
 			schema.UserTable.Columns.UpdatedAt,
@@ -86,7 +87,8 @@ func resetPassword(ctx *context.Context, name, password string) error {
 		_, err = tx.Exec(
 			insert,
 			sql.Named("user_id", adminId.String()),
-			sql.Named("name", name),
+			sql.Named("username", username),
+			sql.Named("name", ctx.Config.AdminName),
 			sql.Named("password", hash),
 			sql.Named("updated_at", ts),
 		)
@@ -95,8 +97,8 @@ func resetPassword(ctx *context.Context, name, password string) error {
 			return fmt.Errorf("não foi possível criar usuário")
 		}
 	} else {
-		ctx.Logger.Info("Administrador '" + name + "' foi encontrado. Fazendo atualização.")
-		successMsg = "Administrador '" + name + "' foi atualizado com sucesso."
+		ctx.Logger.Info("Administrador '" + username + "' foi encontrado. Fazendo atualização.")
+		successMsg = "Administrador '" + username + "' foi atualizado com sucesso."
 		update := fmt.Sprintf(
 			`UPDATE %s.%s
 			SET %s = :password, %s = :updated_at
@@ -154,8 +156,7 @@ func main() {
 		logr.Fatal("Erro ao carregar banco de dados", zap.Error(err))
 	}
 	defer func(dataBase *sql.DB) {
-		err := dataBase.Close()
-		if err != nil {
+		if err = dataBase.Close(); err != nil {
 			logr.Error("Erro ao fechar banco de dados", zap.Error(err))
 		}
 	}(dataBase)
@@ -173,13 +174,11 @@ func main() {
 
 	for !ok {
 		fmt.Print("\nNome do usuário administrador: (default: admin) ")
-		_, err := fmt.Scanln(&adminName)
-		if err != nil {
+		if _, err = fmt.Scanln(&adminName); err != nil {
 			adminName = "admin"
 		}
 		fmt.Print("Nova senha do administrador: (>= 4 caracteres) ")
-		_, err = fmt.Scanln(&newPassword)
-		if err != nil {
+		if _, err = fmt.Scanln(&newPassword); err != nil {
 			fmt.Print("Senha não pode ser vazia. Finalizando.")
 			return
 		}
@@ -206,7 +205,7 @@ func main() {
 	fmt.Println()
 
 	// Cadastrar nova senha
-	if err := resetPassword(ctx, adminName, newPassword); err != nil {
+	if err = resetPassword(ctx, adminName, newPassword); err != nil {
 		logr.Error("Erro ao repor senha de administrador", zap.Error(err))
 		return
 	}

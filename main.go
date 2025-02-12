@@ -4,6 +4,7 @@
 package main
 
 import (
+	"agros_arquivos_patrocinadoras/pkg/app"
 	"agros_arquivos_patrocinadoras/pkg/app/config"
 	"agros_arquivos_patrocinadoras/pkg/app/context"
 	"agros_arquivos_patrocinadoras/pkg/app/db"
@@ -115,6 +116,13 @@ func main() {
 		Config: cfg,
 		DB:     dataBase,
 	}
+
+	// Obter Id do administrador
+	adminId, err := app.GetAdmin(ctx)
+	if err != nil {
+		logr.Fatal("Erro ao buscar Id do administrador", zap.Error(err))
+	}
+	ctx.AdminId = adminId
 
 	// Canal para reiniciar o servidor
 	restartChan := make(chan bool)

@@ -6,6 +6,7 @@ package context
 import (
 	"agros_arquivos_patrocinadoras/pkg/types/config"
 	"database/sql"
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"go.uber.org/zap"
 )
@@ -22,7 +23,8 @@ type Context struct {
 	Config *config.Config
 	// DB é a conexão com o banco de dados, usada para executar operações de
 	// consulta e modificação de dados.
-	DB *sql.DB
+	DB      *sql.DB
+	AdminId uuid.UUID
 }
 
 // GetContext retorna o contexto da aplicação a partir do contexto da

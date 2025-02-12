@@ -7,7 +7,9 @@ package db
 type UserModel struct {
 	// UserId é um identificador único para o usuário.
 	UserId string `json:"user_id"`
-	// Name representa o nome do usuário.
+	// Username representa o nome de usuário, do usuário.
+	Username string `json:"username"`
+	// Name representa o nome de apresentação do usuário.
 	Name string `json:"name"`
 	// Password armazena a senha (hash) do usuário.
 	Password string `json:"password"`

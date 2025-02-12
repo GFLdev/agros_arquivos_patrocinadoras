@@ -4,6 +4,12 @@ import { PhSignIn, PhCircleNotch, PhIdentificationCard, PhPassword } from '@phos
 import InputText from '@/components/InputText.vue'
 import InputPassword from '@/components/InputPassword.vue'
 import type { LoginRequest } from '@/@types/Requests.ts'
+import apiClient from '../services/axios.ts'
+import type { AxiosError } from 'axios'
+import { useAuthStore } from '@/stores/authStore.ts'
+import router from '@/router'
+
+const authStore = useAuthStore()
 
 const visible = ref<boolean>(false)
 const username = ref<string | null>()
@@ -21,22 +27,32 @@ async function handleSignIn(): Promise<void> {
   loading.value = true
 
   const body: LoginRequest = {
-    name: username.value,
+    username: username.value,
     password: passwd.value,
   }
 
-  const res = await fetch('https://localhost:8080/login', {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  })
-    .then((res) => res.json())
-    .finally(() => (loading.value = false))
+  try {
+    const res = await apiClient.post('/login', JSON.stringify(body))
+    const token = res.data?.token
 
-  console.log(res)
+    if (token) {
+      authStore.setToken(token)
+      await authStore.getSession()
+    } else {
+      console.error('Token não recebido')
+    }
+  } catch (e: unknown) {
+    const error = e as AxiosError
+    if (error.response && error.response.status === 401) {
+      // TODO: Exiba uma mensagem amigável para o usuário
+      console.error('Credenciais inválidas')
+    } else {
+      // TODO: Tratar erros de login e exibir mensagens relevantes ao usuário
+      console.error('Erro ao fazer login:', error.message || error)
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

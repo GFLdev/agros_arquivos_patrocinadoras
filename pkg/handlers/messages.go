@@ -11,6 +11,8 @@ const (
 	UpdatedUserMessage     HTTPMessage = "Usuário atualizado com sucesso."
 	DeletedUserMessage     HTTPMessage = "Usuário excluído com sucesso."
 	LoginSuccessMessage    HTTPMessage = "Login realizado com sucesso."
+	EmptyUsernameMessage   HTTPMessage = "Nome de usuário vazio."
+	EmptyNameMessage       HTTPMessage = "Nome vazio."
 	InvalidPasswordMessage HTTPMessage = "Senha com menos de 4 caracteres."
 	DuplicateUserMessage   HTTPMessage = "Nome de usuário já existe."
 )

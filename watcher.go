@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"io"
 	"os"
+	"reflect"
 )
 
 func CloseConfigWatcher(ctx *context.Context, watcher *fsnotify.Watcher) {
@@ -112,10 +113,12 @@ func hashChanged(oldHash []byte, newHash []byte) bool {
 }
 
 func serverParamsChanged(oldConfig, newConfig *types.Config) bool {
-	return newConfig.Port != oldConfig.Port ||
-		newConfig.Environment != oldConfig.Environment ||
-		(newConfig.Environment == "development" &&
-			(newConfig.CertFile != oldConfig.CertFile ||
-				newConfig.KeyFile != oldConfig.KeyFile))
+	changedPort := oldConfig.Port != newConfig.Port
+	changedEnvironment := oldConfig.Environment != newConfig.Environment
+	changedCertFile := oldConfig.CertFile != newConfig.CertFile
+	changedKeyFile := oldConfig.KeyFile != newConfig.KeyFile
+	changedOrigins := reflect.DeepEqual(oldConfig.Origins, newConfig.Origins)
 
+	return changedPort || changedOrigins ||
+		(changedEnvironment && (changedCertFile || changedKeyFile))
 }

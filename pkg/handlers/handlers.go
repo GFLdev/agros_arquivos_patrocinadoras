@@ -12,8 +12,41 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/auth"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
 	"net/http"
+	"time"
 )
+
+// SessionHandler retorna os dados do JWT token para a sessão de um usuário.
+//
+// Parâmetros:
+//   - c: contexto Echo contendo as informações da requisição HTTP.
+//
+// Retorno:
+//   - error: um erro HTTP apropriado em caso de falha ou nil caso o processo
+//     seja bem-sucedido.
+func SessionHandler(c echo.Context) error {
+	// Cabeçalho
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Obtenção do contexto da aplicação
+	ctx := context.GetContext(c)
+
+	claims, err := auth.GetClaims(c)
+	if err != nil {
+		ctx.Logger.Error("Erro ao obter claims.", zap.Error(err))
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
+
+	// Checar se é administrador
+	admin := auth.AuthenticateAdmin(c)
+
+	return c.JSON(http.StatusOK, echo.Map{
+		"id":    claims.Id,
+		"name":  claims.Name,
+		"admin": admin,
+	})
+}
 
 // LoginHandler gerencia o processo de login de um usuário.
 //
@@ -34,26 +67,54 @@ func LoginHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
+	// Validar parâmetros
+	if body.Username == "" {
+		return c.JSON(http.StatusBadRequest, EmptyUsernameMessage)
+	}
+	if len(body.Password) < 4 {
+		return c.JSON(http.StatusBadRequest, InvalidPasswordMessage)
+	}
+
 	// Verificar credenciais
-	user := app.UserParams{
-		Name:     body.Name,
+	loginParams := app.LoginParams{
+		Username: body.Username,
 		Password: body.Password,
 	}
-	userId, err := app.GetCredentials(ctx, user)
-	if err != nil || userId == uuid.Nil {
+	loginData, err := app.QueryLogin(ctx, loginParams)
+	if err != nil || loginData.UserId == uuid.Nil {
 		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
-	// Gerar token e resposta
-	token, err := auth.GenerateToken(c, userId, body.Name)
+	// Verificar se é administrador
+	admin := auth.AuthenticateAdmin(c)
+
+	// Gerar token
+	duration := time.Duration(ctx.Config.JwtExpires) * time.Minute
+	expiresAt := time.Now().Add(duration)
+	claimsData := auth.ClaimsData{
+		Id:   loginData.UserId,
+		Name: loginData.Name,
+	}
+	token, err := auth.GenerateToken(c, claimsData, expiresAt)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	c.Response().Header().Add(echo.HeaderAuthorization, "Bearer "+token)
-	return c.JSON(http.StatusOK, echo.Map{
-		"token":   token,
-		"message": LoginSuccessMessage,
-	})
+
+	// Adicionar cookie e resposta
+	jwtCookie := &http.Cookie{
+		Name:    "jwt",
+		Value:   token,
+		Expires: expiresAt,
+	}
+	c.SetCookie(jwtCookie)
+	res := LoginRes{
+		Token:   token,
+		Message: LoginSuccessMessage,
+		Id:      loginData.UserId.String(),
+		Name:    loginData.Name,
+		Admin:   admin,
+	}
+	return c.JSON(http.StatusOK, res)
 }
 
 // CreateUserHandler gerencia a criação de um novo usuário no sistema.
@@ -68,6 +129,11 @@ func CreateUserHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
+
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
 	body, err := BodyUnmarshall[CreateUserReq](c)
@@ -75,11 +141,20 @@ func CreateUserHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
-	// Validar senha
+	// Validar parâmetros
+	if body.Username == "" {
+		return c.JSON(http.StatusBadRequest, EmptyUsernameMessage)
+	}
+	if body.Name == "" {
+		return c.JSON(http.StatusBadRequest, EmptyNameMessage)
+	}
 	if len(body.Password) < 4 {
 		return c.JSON(http.StatusBadRequest, InvalidPasswordMessage)
 	}
-	user := app.UserParams{
+
+	// Criar usuário
+	user := app.UserData{
+		Username: body.Username,
 		Name:     body.Name,
 		Password: body.Password,
 	}
@@ -90,10 +165,13 @@ func CreateUserHandler(c echo.Context) error {
 		}
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	return c.JSON(http.StatusCreated, echo.Map{
-		"id":      id.String(),
-		"message": string(CreatedUserMessage),
-	})
+
+	// Resposta
+	res := CreateResponse{
+		Id:      id,
+		Message: CreatedUserMessage,
+	}
+	return c.JSON(http.StatusCreated, res)
 }
 
 // CreateCategoryHandler gerencia a criação de uma nova categoria associada
@@ -108,6 +186,11 @@ func CreateUserHandler(c echo.Context) error {
 func CreateCategoryHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
@@ -126,7 +209,7 @@ func CreateCategoryHandler(c echo.Context) error {
 	}
 
 	// Criar categoria
-	categ := app.CategParams{
+	categ := app.CategData{
 		UserId: userId,
 		Name:   body.Name,
 	}
@@ -134,10 +217,13 @@ func CreateCategoryHandler(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	return c.JSON(http.StatusCreated, echo.Map{
-		"id":      id.String(),
-		"message": string(CreatedCategoryMessage),
-	})
+
+	// Resposta
+	res := CreateResponse{
+		Id:      id,
+		Message: CreatedCategoryMessage,
+	}
+	return c.JSON(http.StatusCreated, res)
 }
 
 // CreateFileHandler gerencia a criação de um novo arquivo em uma categoria
@@ -152,6 +238,11 @@ func CreateCategoryHandler(c echo.Context) error {
 func CreateFileHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
@@ -179,7 +270,7 @@ func CreateFileHandler(c echo.Context) error {
 	}
 
 	// Criar arquivo
-	file := app.FileParams{
+	file := app.FileData{
 		CategId:   categId,
 		Name:      body.Name,
 		Extension: body.Extension,
@@ -190,10 +281,13 @@ func CreateFileHandler(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
-	return c.JSON(http.StatusCreated, echo.Map{
-		"id":      id.String(),
-		"message": string(CreatedFileMessage),
-	})
+
+	// Resposta
+	res := CreateResponse{
+		Id:      id,
+		Message: CreatedFileMessage,
+	}
+	return c.JSON(http.StatusCreated, res)
 }
 
 // GetAllUsers obtém todos os usuários presentes no repositório.
@@ -207,6 +301,11 @@ func CreateFileHandler(c echo.Context) error {
 func GetAllUsers(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Obtenção do contexto da aplicação e de todos os usuários
 	ctx := context.GetContext(c)
@@ -234,6 +333,11 @@ func GetUserById(c echo.Context) error {
 	userId, err := ParseEntityUUID(c, User)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidUserIdMessage)
+	}
+
+	// Autorizar usuário
+	if check := auth.AuthenticateUser(c, userId); !check {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
 	// Obtenção do usuário
@@ -264,6 +368,11 @@ func GetAllCategories(c echo.Context) error {
 	}
 	if _, err = app.QueryUserById(ctx, userId); err != nil {
 		return c.JSON(http.StatusNotFound, UserNotFoundMessage)
+	}
+
+	// Autorizar usuário
+	if check := auth.AuthenticateUser(c, userId); !check {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
 	// Obtenção de todas as categorias
@@ -300,6 +409,11 @@ func GetCategoryById(c echo.Context) error {
 	categId, err := ParseEntityUUID(c, Category)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, InvalidCategoryIdMessage)
+	}
+
+	// Autorizar usuário
+	if check := auth.AuthenticateUser(c, userId); !check {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
 	// Obtenção da categoria
@@ -339,6 +453,11 @@ func GetAllFiles(c echo.Context) error {
 	categ, err := app.QueryCategoryById(ctx, categId)
 	if err != nil && categ.UserId != userId.String() {
 		return c.JSON(http.StatusNotFound, CategoryNotFoundMessage)
+	}
+
+	// Autorizar usuário
+	if check := auth.AuthenticateUser(c, userId); !check {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
 	}
 
 	// Obtenção de todos os arquivos
@@ -384,6 +503,11 @@ func GetFileById(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, InvalidFileIdMessage)
 	}
 
+	// Autorizar usuário
+	if check := auth.AuthenticateUser(c, userId); !check {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
+
 	// Obtenção dos dados do arquivo
 	file, err := app.QueryFileById(ctx, fileId)
 	if err != nil {
@@ -405,6 +529,11 @@ func UpdateUserHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
+
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
 	body, err := BodyUnmarshall[UpdateUserReq](c)
@@ -413,7 +542,7 @@ func UpdateUserHandler(c echo.Context) error {
 	}
 
 	// Caso nada seja requisitado para alterar
-	if body.Name == "" && body.Password == "" {
+	if body.Username == "" && body.Name == "" && body.Password == "" {
 		return c.JSON(http.StatusBadRequest, BadRequestMessage)
 	}
 
@@ -430,7 +559,11 @@ func UpdateUserHandler(c echo.Context) error {
 	if body.Password != "" && len(body.Password) < 4 {
 		return c.JSON(http.StatusBadRequest, InvalidPasswordMessage)
 	}
-	userParams := app.UserParams{Name: body.Name, Password: body.Password}
+	userParams := app.UserData{
+		Username: body.Username,
+		Name:     body.Name,
+		Password: body.Password,
+	}
 	if err = app.UpdateUser(ctx, userId, userParams); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
@@ -449,6 +582,11 @@ func UpdateUserHandler(c echo.Context) error {
 func UpdateCategoryHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
@@ -493,7 +631,7 @@ func UpdateCategoryHandler(c echo.Context) error {
 	}
 
 	// Alteração
-	categParams := app.CategParams{UserId: parsedUserId, Name: body.Name}
+	categParams := app.CategData{UserId: parsedUserId, Name: body.Name}
 	if err = app.UpdateCategory(ctx, categId, categParams); err != nil {
 		return c.JSON(http.StatusInternalServerError, InternalServerErrorMessage)
 	}
@@ -511,6 +649,11 @@ func UpdateCategoryHandler(c echo.Context) error {
 func UpdateFileHandler(c echo.Context) error {
 	// Cabeçalho
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Obtenção do contexto da aplicação e do corpo da requisição
 	ctx := context.GetContext(c)
@@ -565,7 +708,7 @@ func UpdateFileHandler(c echo.Context) error {
 	}
 
 	// Alteração
-	fileParams := app.FileParams{
+	fileParams := app.FileData{
 		CategId:   parsedCategId,
 		Name:      body.Name,
 		Extension: body.Extension,
@@ -590,6 +733,11 @@ func DeleteUser(c echo.Context) error {
 	// Cabeçalho e contexto da aplicação
 	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)
@@ -619,6 +767,11 @@ func DeleteCategory(c echo.Context) error {
 	// Cabeçalho e contexto da aplicação
 	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)
@@ -657,6 +810,11 @@ func DeleteFile(c echo.Context) error {
 	// Cabeçalho e contexto da aplicação
 	ctx := context.GetContext(c)
 	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
+
+	// Checar se é admin
+	if admin := auth.AuthenticateAdmin(c); !admin {
+		return c.JSON(http.StatusUnauthorized, UnauthorizedMessage)
+	}
 
 	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)

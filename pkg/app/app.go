@@ -19,22 +19,55 @@ import (
 	"time"
 )
 
-func CheckUsername(ctx *context.Context, name string) (bool, error) {
+func GetAdmin(ctx *context.Context) (uuid.UUID, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
 		`SELECT %s
 		FROM %s.%s
-		WHERE %s = :name`,
+		WHERE %s = :username`,
 		schema.UserTable.Columns.UserId,
 		schema.Name,
 		schema.UserTable.Name,
-		schema.UserTable.Columns.Name,
+		schema.UserTable.Columns.Username,
+	)
+
+	// Obtenção da linha
+	var idString string
+	row := ctx.DB.QueryRow(query, sql.Named("username", ctx.Config.AdminUsername))
+	err := row.Scan(&idString)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		return uuid.Nil, fmt.Errorf("usuário admin não encontrado")
+	} else if err != nil {
+		ctx.Logger.Error("Erro ao buscar usuário", zap.Error(err))
+		return uuid.Nil, fmt.Errorf("não foi possível procurar usuário")
+	}
+
+	// Converter para uuid.UUID
+	userId, err := uuid.Parse(idString)
+	if err != nil {
+		ctx.Logger.Error("Erro ao converter Id do administrador.", zap.Error(err))
+		return uuid.Nil, fmt.Errorf("não foi possível converter Id do administrador")
+	}
+	return userId, nil
+}
+
+func CheckUsername(ctx *context.Context, username string) (bool, error) {
+	// Query
+	schema := &ctx.Config.Database.Schema
+	query := fmt.Sprintf(
+		`SELECT %s
+		FROM %s.%s
+		WHERE %s = :username`,
+		schema.UserTable.Columns.UserId,
+		schema.Name,
+		schema.UserTable.Name,
+		schema.UserTable.Columns.Username,
 	)
 
 	// Obtenção da linha
 	var userId uuid.UUID
-	row := ctx.DB.QueryRow(query, sql.Named("name", name))
+	row := ctx.DB.QueryRow(query, sql.Named("username", username))
 	err := row.Scan(&userId)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return true, nil
@@ -45,41 +78,43 @@ func CheckUsername(ctx *context.Context, name string) (bool, error) {
 	return false, fmt.Errorf("nome de usuário já existente")
 }
 
-func GetCredentials(ctx *context.Context, p UserParams) (uuid.UUID, error) {
+func QueryLogin(ctx *context.Context, p LoginParams) (LoginData, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s, %s
+		`SELECT %s, %s, %s
 		FROM %s.%s
-		WHERE %s = :name`,
+		WHERE %s = :username`,
 		schema.UserTable.Columns.UserId,
+		schema.UserTable.Columns.Name,
 		schema.UserTable.Columns.Password,
 		schema.Name,
 		schema.UserTable.Name,
-		schema.UserTable.Columns.Name,
+		schema.UserTable.Columns.Username,
 	)
 
 	// Obtenção da linha
-	rows, err := ctx.DB.Query(query, sql.Named("name", p.Name))
+	rows, err := ctx.DB.Query(query, sql.Named("username", p.Username))
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("usuário não encontrado")
+		return LoginData{}, fmt.Errorf("usuário não encontrado")
 	}
 	defer closeRows(ctx, rows)
 
 	// Iterar por cada uma das linhas
 	for rows.Next() {
-		l := LoginCompare{}
-		err = rows.Scan(&l.UserId, &l.Hash)
+		var hash string
+		data := LoginData{}
+		err = rows.Scan(&data.UserId, &data.Name, &hash)
 		if err != nil {
 			continue
 		}
-		err = bcrypt.CompareHashAndPassword([]byte(l.Hash), []byte(p.Password))
+		err = bcrypt.CompareHashAndPassword([]byte(hash), []byte(p.Password))
 		if err == nil {
-			return l.UserId, nil
+			return data, nil
 		}
 	}
 
-	return uuid.Nil, fmt.Errorf("não autenticado")
+	return LoginData{}, fmt.Errorf("não autenticado")
 }
 
 func rollback(ctx *context.Context, tx *sql.Tx, err *error) {
@@ -91,11 +126,11 @@ func rollback(ctx *context.Context, tx *sql.Tx, err *error) {
 	}
 }
 
-func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
+func CreateUser(ctx *context.Context, p UserData) (uuid.UUID, error) {
 	var err error
 
 	// Checar nome de usuário
-	ok, err := CheckUsername(ctx, p.Name)
+	ok, err := CheckUsername(ctx, p.Username)
 	if !ok {
 		return uuid.Nil, err
 	}
@@ -122,11 +157,12 @@ func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	schema := &ctx.Config.Database.Schema
 	insert := fmt.Sprintf(
 		`INSERT INTO %s.%s
-  		(%s, %s, %s, %s)
-		VALUES (:user_id, :name, :password, :updated_at)`,
+  		(%s, %s, %s, %s, %s)
+		VALUES (:user_id, :username, :name, :password, :updated_at)`,
 		schema.Name,
 		schema.UserTable.Name,
 		schema.UserTable.Columns.UserId,
+		schema.UserTable.Columns.Username,
 		schema.UserTable.Columns.Name,
 		schema.UserTable.Columns.Password,
 		schema.UserTable.Columns.UpdatedAt,
@@ -142,6 +178,7 @@ func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	_, err = tx.Exec(
 		insert,
 		sql.Named("user_id", userId.String()),
+		sql.Named("username", p.Username),
 		sql.Named("name", p.Name),
 		sql.Named("password", hash),
 		sql.Named("updated_at", ts),
@@ -159,7 +196,7 @@ func CreateUser(ctx *context.Context, p UserParams) (uuid.UUID, error) {
 	return userId, nil
 }
 
-func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
+func CreateCategory(ctx *context.Context, p CategData) (uuid.UUID, error) {
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	categId, err := uuid.NewUUID()
@@ -213,7 +250,7 @@ func CreateCategory(ctx *context.Context, p CategParams) (uuid.UUID, error) {
 	return categId, nil
 }
 
-func CreateFile(ctx *context.Context, p FileParams) (uuid.UUID, error) {
+func CreateFile(ctx *context.Context, p FileData) (uuid.UUID, error) {
 	// Geração do UUID e Timestamp
 	ts := time.Now().Unix()
 	fileId, err := uuid.NewUUID()
@@ -296,7 +333,7 @@ func closeRows(ctx *context.Context, rows *sql.Rows) {
 //     e o zap.Logger para registrar logs de advertência em caso de erro.
 //
 // Retorno:
-//   - []db.UserModel: uma lista de usuários contendo os campos UserId, Name e
+//   - []db.UserModel: uma lista de usuários contendo os campos UserId, Username e
 //     UpdatedAt.
 //   - error: um erro é retornado caso a query ou o processamento dos resultados
 //     falhe.
@@ -306,12 +343,15 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s,%s,%s FROM %s.%s`,
+		`SELECT %s,%s,%s,%s FROM %s.%s WHERE %s <> %s`,
 		schema.UserTable.Columns.UserId,
+		schema.UserTable.Columns.Username,
 		schema.UserTable.Columns.Name,
 		schema.UserTable.Columns.UpdatedAt,
 		schema.Name,
 		schema.UserTable.Name,
+		schema.UserTable.Columns.Username,
+		ctx.Config.AdminUsername,
 	)
 
 	// Obtenção das linhas
@@ -324,7 +364,7 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 	// Iterar por cada uma das linhas
 	for rows.Next() {
 		u := db.UserModel{Password: ""}
-		err = rows.Scan(&u.UserId, &u.Name, &u.UpdatedAt)
+		err = rows.Scan(&u.UserId, &u.Username, &u.Name, &u.UpdatedAt)
 		if err != nil {
 			ctx.Logger.Error("Erro ao obter usuário.", zap.Error(err))
 			return users, fmt.Errorf("não foi possível obter todos os usuários")
@@ -345,7 +385,7 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 //
 // Retorno:
 //   - []db.CategModel: uma lista de categorias contendo os campos CategId,
-//     UserId, Name e UpdatedAt.
+//     UserId, Username e UpdatedAt.
 //   - error: um erro é retornado caso a consulta ou o processamento dos
 //     resultados falhe.
 func QueryAllCategories(ctx *context.Context, userId uuid.UUID) ([]db.CategModel, error) {
@@ -397,7 +437,7 @@ func QueryAllCategories(ctx *context.Context, userId uuid.UUID) ([]db.CategModel
 //
 // Retorno:
 //   - []db.FileModel: uma lista de arquivos contendo os campos FileId,
-//     CategId, Name, Extension, Mimetype e UpdatedAt.
+//     CategId, Username, Extension, Mimetype e UpdatedAt.
 //   - error: um erro é retornado caso a consulta ou o processamento dos
 //     resultados falhe.
 func QueryAllFiles(ctx *context.Context, categId uuid.UUID) ([]db.FileModel, error) {
@@ -467,10 +507,11 @@ func QueryUserById(ctx *context.Context, userId uuid.UUID) (db.UserModel, error)
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s,%s,%s
+		`SELECT %s,%s,%s,%s
 		FROM %s.%s
 		WHERE %s = :user_id`,
 		schema.UserTable.Columns.UserId,
+		schema.UserTable.Columns.Username,
 		schema.UserTable.Columns.Name,
 		schema.UserTable.Columns.UpdatedAt,
 		schema.Name,
@@ -480,7 +521,7 @@ func QueryUserById(ctx *context.Context, userId uuid.UUID) (db.UserModel, error)
 
 	// Obtenção da linha
 	row := ctx.DB.QueryRow(query, sql.Named("user_id", userId.String()))
-	err := row.Scan(&user.UserId, &user.Name, &user.UpdatedAt)
+	err := row.Scan(&user.UserId, &user.Username, &user.Name, &user.UpdatedAt)
 	if err != nil {
 		return user, fmt.Errorf("não foi possível obter usuário")
 	}
@@ -579,7 +620,7 @@ func QueryFileById(ctx *context.Context, fileId uuid.UUID) (db.FileModel, error)
 	return file, nil
 }
 
-func UpdateUser(ctx *context.Context, userId uuid.UUID, p UserParams) error {
+func UpdateUser(ctx *context.Context, userId uuid.UUID, p UserData) error {
 	// Iniciar uma transação
 	tx, err := ctx.DB.Begin()
 	if err != nil {
@@ -597,6 +638,10 @@ func UpdateUser(ctx *context.Context, userId uuid.UUID, p UserParams) error {
 	schema := &ctx.Config.Database.Schema
 	var args []any
 	var set []string
+	if p.Username != "" {
+		args = append(args, sql.Named("username", p.Username))
+		set = append(set, schema.UserTable.Columns.Name+" = :username")
+	}
 	if p.Name != "" {
 		args = append(args, sql.Named("name", p.Name))
 		set = append(set, schema.UserTable.Columns.Name+" = :name")
@@ -644,7 +689,7 @@ func UpdateUser(ctx *context.Context, userId uuid.UUID, p UserParams) error {
 	return nil
 }
 
-func UpdateCategory(ctx *context.Context, categId uuid.UUID, p CategParams) error {
+func UpdateCategory(ctx *context.Context, categId uuid.UUID, p CategData) error {
 	// Iniciar uma transação
 	tx, err := ctx.DB.Begin()
 	if err != nil {
@@ -703,7 +748,7 @@ func UpdateCategory(ctx *context.Context, categId uuid.UUID, p CategParams) erro
 	return nil
 }
 
-func UpdateFile(ctx *context.Context, fileId uuid.UUID, p FileParams) error {
+func UpdateFile(ctx *context.Context, fileId uuid.UUID, p FileData) error {
 	// Iniciar uma transação
 	tx, err := ctx.DB.Begin()
 	if err != nil {

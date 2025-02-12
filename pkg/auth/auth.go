@@ -5,6 +5,7 @@ package auth
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
@@ -12,16 +13,20 @@ import (
 	"time"
 )
 
-// CustomClaims define uma estrutura personalizada para os claims de um token
-// JWT.
-type CustomClaims struct {
+// ClaimsData armazena informações relacionadas a um usuário para os Claims de
+// seu token.
+type ClaimsData struct {
 	// Id representa o identificador único para os claims, usado para
 	// identificar um usuário.
 	Id uuid.UUID `json:"id"`
-	// Name representa o nome do usuário ou entidade associado aos claims.
+	// Name representa o nome de apresentação do usuário.
 	Name string `json:"name"`
-	// Admin indica se o usuário possui privilégios administrativos.
-	Admin bool `json:"admin"`
+}
+
+// CustomClaims define uma estrutura personalizada para os claims de um token
+// JWT.
+type CustomClaims struct {
+	ClaimsData
 	jwt.RegisteredClaims
 }
 
@@ -37,19 +42,14 @@ type CustomClaims struct {
 // Retornos:
 //   - string: token JWT gerado.
 //   - error: erro caso ocorra algum problema durante a geração do token.
-func GenerateToken(c echo.Context, userId uuid.UUID, userName string) (string, error) {
+func GenerateToken(c echo.Context, data ClaimsData, expiresAt time.Time) (string, error) {
 	ctx := context.GetContext(c)
 
 	// JWT Claims
-	duration := time.Duration(ctx.Config.JwtExpires)
 	claims := CustomClaims{
-		Id:    userId,
-		Name:  userName,
-		Admin: true,
+		ClaimsData: data,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(
-				time.Now().Add(duration * time.Minute),
-			),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},
 	}
 
@@ -61,4 +61,39 @@ func GenerateToken(c echo.Context, userId uuid.UUID, userName string) (string, e
 		return "", err
 	}
 	return t, nil
+}
+
+func GetClaims(c echo.Context) (*CustomClaims, error) {
+	user, ok := c.Get("user").(*jwt.Token)
+	if !ok {
+		return nil, fmt.Errorf("erro ao obter token")
+	}
+
+	claims, ok := user.Claims.(*CustomClaims)
+	if !ok {
+		return nil, fmt.Errorf("erro ao obter claims")
+	}
+	return claims, nil
+}
+
+func AuthenticateAdmin(c echo.Context) bool {
+	ctx := context.GetContext(c)
+	claims, err := GetClaims(c)
+	if err != nil || claims.Id != ctx.AdminId {
+		return false
+	}
+	return true
+}
+
+func AuthenticateUser(c echo.Context, userId uuid.UUID) bool {
+	claims, err := GetClaims(c)
+	if err != nil {
+		return false
+	}
+
+	if claims.Id != userId {
+		return false
+	}
+
+	return true
 }

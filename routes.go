@@ -2,7 +2,10 @@ package main
 
 import (
 	"agros_arquivos_patrocinadoras/pkg/app/context"
+	"agros_arquivos_patrocinadoras/pkg/auth"
 	"agros_arquivos_patrocinadoras/pkg/handlers"
+	"github.com/golang-jwt/jwt/v5"
+	echojwt "github.com/labstack/echo-jwt/v4"
 	"github.com/labstack/echo/v4"
 	"net/http"
 )
@@ -15,29 +18,41 @@ import (
 func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	ctx.Logger.Info("Configurando rotas")
 
+	// Grupo para autenticação
+	authGroup := e.Group("/auth")
+	authGroup.Use(echojwt.WithConfig(echojwt.Config{
+		SigningKey: []byte(ctx.Config.JwtSecret),
+		NewClaimsFunc: func(c echo.Context) jwt.Claims {
+			return new(auth.CustomClaims)
+		},
+	}))
+
 	// Login
 	e.POST("/login", handlers.LoginHandler)
 
+	// Sessão
+	authGroup.GET("/session", handlers.SessionHandler)
+
 	// Usuário
-	e.POST("/user", handlers.CreateUserHandler)
-	e.GET("/user", handlers.GetAllUsers)
-	e.GET("/user/:userId", handlers.GetUserById)
-	e.PATCH("/user/:userId", handlers.UpdateUserHandler)
-	e.DELETE("/user/:userId", handlers.DeleteUser)
+	authGroup.POST("/user", handlers.CreateUserHandler)
+	authGroup.GET("/user", handlers.GetAllUsers)
+	authGroup.GET("/user/:userId", handlers.GetUserById)
+	authGroup.PATCH("/user/:userId", handlers.UpdateUserHandler)
+	authGroup.DELETE("/user/:userId", handlers.DeleteUser)
 
 	// Categorias
-	e.POST("/user/:userId/category", handlers.CreateCategoryHandler)
-	e.GET("/user/:userId/category", handlers.GetAllCategories)
-	e.GET("/user/:userId/category/:categId", handlers.GetCategoryById)
-	e.PATCH("/user/:userId/category/:categId", handlers.UpdateCategoryHandler)
-	e.DELETE("/user/:userId/category/:categId", handlers.DeleteCategory)
+	authGroup.POST("/user/:userId/category", handlers.CreateCategoryHandler)
+	authGroup.GET("/user/:userId/category", handlers.GetAllCategories)
+	authGroup.GET("/user/:userId/category/:categId", handlers.GetCategoryById)
+	authGroup.PATCH("/user/:userId/category/:categId", handlers.UpdateCategoryHandler)
+	authGroup.DELETE("/user/:userId/category/:categId", handlers.DeleteCategory)
 
 	// Arquivos
-	e.POST("/user/:userId/category/:categId/file", handlers.CreateFileHandler)
-	e.GET("/user/:userId/category/:categId/file", handlers.GetAllFiles)
-	e.GET("/user/:userId/category/:categId/file/:fileId", handlers.GetFileById)
-	e.PATCH("/user/:userId/category/:categId/file/:fileId", handlers.UpdateFileHandler)
-	e.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFile)
+	authGroup.POST("/user/:userId/category/:categId/file", handlers.CreateFileHandler)
+	authGroup.GET("/user/:userId/category/:categId/file", handlers.GetAllFiles)
+	authGroup.GET("/user/:userId/category/:categId/file/:fileId", handlers.GetFileById)
+	authGroup.PATCH("/user/:userId/category/:categId/file/:fileId", handlers.UpdateFileHandler)
+	authGroup.DELETE("/user/:userId/category/:categId/file/:fileId", handlers.DeleteFile)
 
 	// Preflight: rota coringa
 	e.OPTIONS("/*", func(c echo.Context) error {

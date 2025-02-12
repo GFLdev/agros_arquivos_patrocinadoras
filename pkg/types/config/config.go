@@ -10,7 +10,9 @@ type Config struct {
 	Environment string `json:"environment" validate:"required"`
 	// Origins contém a lista de origens permitidas para acessar os recursos.
 	Origins []string `json:"origins" validate:"required"`
-	// AdminName especifica o nome do usuário administrador no banco.
+	// AdminName especifica o nome de usuário administrador no banco.
+	AdminUsername string `json:"admin_username" validate:"required"`
+	// AdminName especifica o nome do administrador no banco.
 	AdminName string `json:"admin_name" validate:"required"`
 	// Port define a porta onde o servidor da aplicação será executado.
 	Port int `json:"port" validate:"required"`
@@ -67,7 +69,9 @@ type Table[T interface{}] struct {
 type UserTable struct {
 	// UserId define a coluna do identificador único de um usuário.
 	UserId string `json:"user_id"`
-	// Name define a coluna do nome de um usuário.
+	// Username define a coluna do nome de usuário, de um usuário.
+	Username string `json:"username"`
+	// Name define a coluna do nome de apresentação de um usuário.
 	Name string `json:"name"`
 	// Password define a coluna da senha de um usuário.
 	Password string `json:"password"`
