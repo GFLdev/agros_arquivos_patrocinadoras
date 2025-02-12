@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import Header from '@/components/HeaderSection.vue'
+import Header from '@/components/generic/HeaderSection.vue'
 import { PhEnvelopeSimple, PhMapPin, PhPhone } from '@phosphor-icons/vue'
 </script>
 
 <template>
   <Header />
   <main
-    class="flex w-screen flex-col items-center justify-center gap-8 bg-gray bg-opacity-5 px-8 py-4 sm:px-16 sm:py-8"
+    class="flex w-screen flex-col items-center justify-center gap-8 bg-gray bg-opacity-5 px-8 py-4 font-lato sm:px-16 sm:py-8"
   >
-    <section
-      class="w-fit max-w-3xl rounded-lg bg-white px-10 py-8 text-center shadow-xl drop-shadow-xl sm:text-lg"
-    >
+    <section class="w-fit max-w-3xl rounded-lg bg-white px-10 py-8 text-center shadow-xl drop-shadow-xl sm:text-lg">
       <p>
-        Nesta página estão disponíveis informações sobre os planos de previdência e de saúde do
-        Agros, em atendimento à Resolução Normativa 389, da Agência Nacional de Saúde Suplementar
-        (ANS).
+        Nesta página estão disponíveis informações sobre os planos de previdência e de saúde do Agros, em atendimento à
+        Resolução Normativa 389, da Agência Nacional de Saúde Suplementar (ANS).
       </p>
     </section>
     <div class="w-full max-w-5xl">
@@ -37,12 +34,12 @@ import { PhEnvelopeSimple, PhMapPin, PhPhone } from '@phosphor-icons/vue'
       </section>
     </div>
     <!-- Divisor -->
-    <div class="relative w-full my-8">
+    <div class="relative my-8 w-full">
       <div class="absolute inset-0 flex items-center" aria-hidden="true">
-        <div class="border-gray w-full border-t border-opacity-30" />
+        <div class="w-full border-t border-gray border-opacity-30" />
       </div>
       <div class="relative flex justify-center">
-        <span class="bg-gray bg-[ px-2 text-sm text-gray-500">Continue</span>
+        <span class="bg-[ text-gray-500 bg-gray px-2 text-sm">Continue</span>
       </div>
     </div>
     <!-- Seção de dúvidas -->
@@ -75,7 +72,7 @@ import { PhEnvelopeSimple, PhMapPin, PhPhone } from '@phosphor-icons/vue'
               <PhPhone class="size-6" aria-hidden="true" />
             </dt>
             <dd>
-              <a >(31) 3899-6550<br />ramal 6539</a>
+              <a>(31) 3899-6550<br />ramal 6539</a>
             </dd>
           </div>
           <div

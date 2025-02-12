@@ -8,7 +8,7 @@ const authStore = useAuthStore()
 
 <template>
   <header
-    class="flex w-screen items-center justify-center bg-gradient-90 from-secondary to-primary"
+    class="flex w-screen items-center justify-center bg-gradient-90 from-secondary to-primary font-lato"
   >
     <section
       class="flex w-full max-w-[1620px] flex-row items-center justify-between px-8 py-4"
@@ -17,7 +17,7 @@ const authStore = useAuthStore()
         <img :src="Logo" class="w-[200px]" alt="Logo Agros" />
       </div>
       <div class="text-center sm:justify-self-center">
-        <h1 class="text-xl text-white sm:text-2xl">Espaço Patrocinadora</h1>
+        <h1 class="text-2xl text-white sm:text-3xl">Espaço Patrocinadora</h1>
       </div>
       <div class="justify-self-end">
         <button

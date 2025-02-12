@@ -86,12 +86,13 @@ func AuthenticateAdmin(c echo.Context) bool {
 }
 
 func AuthenticateUser(c echo.Context, userId uuid.UUID) bool {
+	ctx := context.GetContext(c)
 	claims, err := GetClaims(c)
 	if err != nil {
 		return false
 	}
 
-	if claims.Id != userId {
+	if claims.Id != userId && claims.Id != ctx.AdminId {
 		return false
 	}
 

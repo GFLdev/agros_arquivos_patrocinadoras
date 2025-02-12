@@ -32,79 +32,79 @@ type Config struct {
 // dados.
 type Database struct {
 	// Service define o nome do serviço do banco de dados (ex.: "ORCL").
-	Service string `json:"service"`
+	Service string `json:"service" validate:"required"`
 	// Username define o nome do usuário usado para autenticação no banco.
-	Username string `json:"username"`
+	Username string `json:"username" validate:"required"`
 	// Server define o endereço do servidor onde o banco de dados está hospedado.
-	Server string `json:"server"`
+	Server string `json:"server" validate:"required"`
 	// Port define a porta de conexão para o banco de dados.
-	Port string `json:"port"`
+	Port string `json:"port" validate:"required"`
 	// Password define a senha do usuário usada para autenticação no banco.
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 	// Schema representa as configurações e tabelas do esquema do banco de dados.
-	Schema Schema `json:"schema"`
+	Schema Schema `json:"schema" validate:"required"`
 }
 
 // Schema define o esquema usado no banco de dados.
 type Schema struct {
 	// Name define o nome do esquema no banco de dados.
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// UserTable representa a configuração da tabela de usuários no esquema.
-	UserTable Table[UserTable] `json:"user_table"`
+	UserTable Table[UserTable] `json:"user_table" validate:"required"`
 	// CategTable representa a configuração da tabela de categorias no esquema.
-	CategTable Table[CategTable] `json:"categ_table"`
+	CategTable Table[CategTable] `json:"categ_table" validate:"required"`
 	// FileTable representa a configuração da tabela de arquivos no esquema.
-	FileTable Table[FileTable] `json:"file_table"`
+	FileTable Table[FileTable] `json:"file_table" validate:"required"`
 }
 
 // Table representa uma tabela genérica usada no esquema do banco de dados.
 type Table[T interface{}] struct {
 	// Name define o nome da tabela no banco de dados.
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// Columns representa as colunas específicas associadas à tabela.
-	Columns T `json:"columns"`
+	Columns T `json:"columns" validate:"required"`
 }
 
 // UserTable representa a estrutura das colunas na tabela de usuários do banco.
 type UserTable struct {
 	// UserId define a coluna do identificador único de um usuário.
-	UserId string `json:"user_id"`
+	UserId string `json:"user_id" validate:"required"`
 	// Username define a coluna do nome de usuário, de um usuário.
-	Username string `json:"username"`
+	Username string `json:"username" validate:"required"`
 	// Name define a coluna do nome de apresentação de um usuário.
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// Password define a coluna da senha de um usuário.
-	Password string `json:"password"`
+	Password string `json:"password" validate:"required"`
 	// UpdatedAt define a coluna da última atualização do usuário.
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at" validate:"required"`
 }
 
 // CategTable representa a estrutura das colunas na tabela de categorias do banco.
 type CategTable struct {
 	// CategId define a coluna do identificador único de uma categoria.
-	CategId string `json:"categ_id"`
+	CategId string `json:"categ_id" validate:"required"`
 	// UserId define a coluna que referencia o identificador de um usuário.
-	UserId string `json:"user_id"`
+	UserId string `json:"user_id" validate:"required"`
 	// Name define a coluna do nome da categoria.
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// UpdatedAt define a coluna da última atualização da categoria.
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at" validate:"required"`
 }
 
 // FileTable representa a estrutura das colunas na tabela de arquivos do banco.
 type FileTable struct {
 	// FileId define a coluna do identificador único de um arquivo.
-	FileId string `json:"file_id"`
+	FileId string `json:"file_id" validate:"required"`
 	// CategId define a coluna que referencia o identificador de uma categoria.
-	CategId string `json:"categ_id"`
+	CategId string `json:"categ_id" validate:"required"`
 	// Name define a coluna do nome de um arquivo.
-	Name string `json:"name"`
+	Name string `json:"name" validate:"required"`
 	// Extension define a coluna da extensão do arquivo (ex.: ".txt").
-	Extension string `json:"extension"`
+	Extension string `json:"extension" validate:"required"`
 	// Mimetype define a coluna que especifica o tipo MIME do arquivo.
-	Mimetype string `json:"mimetype"`
+	Mimetype string `json:"mimetype" validate:"required"`
 	// Blob define a coluna que especifica o conteúdo do arquivo.
-	Blob string `json:"blob"`
+	Blob string `json:"blob" validate:"required"`
 	// UpdatedAt define a coluna da última atualização do arquivo.
-	UpdatedAt string `json:"updated_at"`
+	UpdatedAt string `json:"updated_at" validate:"required"`
 }

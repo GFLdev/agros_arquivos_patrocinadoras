@@ -15,7 +15,7 @@ const router = createRouter({
       // meta: {
       //   requiredAuth: true,
       // },
-      component: () => import('../views/AdminView.vue'),
+      component: () => import('@/views/AdminView.vue'),
     },
     {
       path: '/user/:id',
@@ -23,7 +23,7 @@ const router = createRouter({
       // meta: {
       //   requiredAuth: true,
       // },
-      component: () => import('../views/UserView.vue'),
+      component: () => import('@/views/UserView.vue'),
     },
   ],
 })

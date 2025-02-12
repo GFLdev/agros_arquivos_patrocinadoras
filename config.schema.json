@@ -1,0 +1,193 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "./config.schema.json",
+  "title": "Config",
+  "type": "object",
+  "description": "Configuração principal da aplicação.",
+  "properties": {
+    "environment": {
+      "type": "string",
+      "description": "O ambiente da aplicação (ex.: 'production')."
+    },
+    "origins": {
+      "type": "array",
+      "description": "Lista de origens permitidas para acessar os recursos."
+    },
+    "admin_username": {
+      "type": "string",
+      "description": "Nome de usuário administrador no banco."
+    },
+    "admin_name": {
+      "type": "string",
+      "description": "Nome do administrador no banco."
+    },
+    "port": {
+      "type": "integer",
+      "description": "Porta onde o servidor da aplicação será executado."
+    },
+    "database": {
+      "type": "object",
+      "description": "Configurações de conexão e esquema do banco de dados.",
+      "properties": {
+        "service": {
+          "type": "string",
+          "description": "Nome do serviço do banco de dados (ex.: 'ORCL')."
+        },
+        "username": {
+          "type": "string",
+          "description": "Nome de usuário usado para autenticação no banco."
+        },
+        "server": {
+          "type": "string",
+          "description": "Endereço do servidor onde o banco de dados está hospedado."
+        },
+        "port": {
+          "type": "string",
+          "description": "Porta de conexão para o banco de dados."
+        },
+        "password": {
+          "type": "string",
+          "description": "Senha do usuário para autenticação no banco."
+        },
+        "schema": {
+          "type": "object",
+          "description": "Definição do esquema usado no banco de dados.",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Nome do esquema no banco de dados."
+            },
+            "user_table": {
+              "type": "object",
+              "description": "Configuração da tabela de usuários no esquema.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Nome da tabela no banco de dados."
+                },
+                "columns": {
+                  "type": "object",
+                  "description": "Colunas associadas à tabela de usuários.",
+                  "properties": {
+                    "user_id": {
+                      "type": "string",
+                      "description": "Identificador único de um usuário."
+                    },
+                    "username": {
+                      "type": "string",
+                      "description": "Nome de usuário."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Nome de apresentação de um usuário."
+                    },
+                    "password": {
+                      "type": "string",
+                      "description": "Senha de um usuário."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Última atualização do usuário."
+                    }
+                  }
+                }
+              }
+            },
+            "categ_table": {
+              "type": "object",
+              "description": "Configuração da tabela de categorias no esquema.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Nome da tabela no banco de dados."
+                },
+                "columns": {
+                  "type": "object",
+                  "description": "Colunas associadas à tabela de categorias.",
+                  "properties": {
+                    "categ_id": {
+                      "type": "string",
+                      "description": "Identificador único de uma categoria."
+                    },
+                    "user_id": {
+                      "type": "string",
+                      "description": "Referencia o identificador de um usuário."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Nome da categoria."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Coluna da última atualização da categoria."
+                    }
+                  }
+                }
+              }
+            },
+            "file_table": {
+              "type": "object",
+              "description": "Configuração da tabela de arquivos no esquema.",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Nome da tabela no banco de dados."
+                },
+                "columns": {
+                  "type": "object",
+                  "description": "Colunas associadas à tabela.",
+                  "properties": {
+                    "file_id": {
+                      "type": "string",
+                      "description": "Identificador único de um arquivo."
+                    },
+                    "categ_id": {
+                      "type": "string",
+                      "description": "Referencia o identificador de uma categoria."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Nome do arquivo."
+                    },
+                    "extension": {
+                      "type": "string",
+                      "description": "Extensão do arquivo (ex.: \".txt\")."
+                    },
+                    "mimetype": {
+                      "type": "string",
+                      "description": "Tipo MIME do arquivo."
+                    },
+                    "blob": {
+                      "type": "string",
+                      "description": "Conteúdo do arquivo."
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "description": "Última atualização do arquivo."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "jwt_secret": {
+      "type": "string",
+      "description": "Chave secreta usada para geração e validação de tokens JWT."
+    },
+    "jwt_expires": {
+      "type": "integer",
+      "description": "Tempo de expiração para o token JWT, em minutos."
+    },
+    "cert_file": {
+      "type": "string",
+      "description": "Caminho para o arquivo de certificado SSL (opcional)."
+    },
+    "key_file": {
+      "type": "string",
+      "description": "Caminho para o arquivo de chave SSL (opcional)."
+    }
+  }
+}

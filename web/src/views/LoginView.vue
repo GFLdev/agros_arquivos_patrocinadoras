@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import LoginForm from '@/components/LoginForm.vue'
+import LoginForm from '@/components/login/LoginForm.vue'
 import Logo from '/logo.svg'
 </script>
 
 <template>
   <main
-    class="from-secondary to-primary flex flex-col gap-8 h-screen w-screen items-center justify-center bg-gradient-90"
+    class="flex h-screen w-screen flex-col items-center justify-center gap-8 bg-gradient-90 from-secondary to-primary"
   >
-      <img :src="Logo" class="max-w-[300px] w-full select-none px-4"  alt="Logo Agros"/>
-      <LoginForm />
+    <img :src="Logo" class="w-full max-w-[300px] select-none px-4" alt="Logo Agros" />
+    <LoginForm />
   </main>
 </template>

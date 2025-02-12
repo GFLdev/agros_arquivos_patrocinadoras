@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { PhSignIn, PhCircleNotch, PhIdentificationCard, PhPassword } from '@phosphor-icons/vue'
-import InputText from '@/components/InputText.vue'
-import InputPassword from '@/components/InputPassword.vue'
+import InputText from '@/components/generic/InputText.vue'
+import InputPassword from '@/components/generic/InputPassword.vue'
 import type { LoginRequest } from '@/@types/Requests.ts'
-import apiClient from '../services/axios.ts'
+import apiClient from '@/services/axios.ts'
 import type { AxiosError } from 'axios'
 import { useAuthStore } from '@/stores/authStore.ts'
-import router from '@/router'
 
 const authStore = useAuthStore()
 
@@ -60,9 +59,7 @@ async function handleSignIn(): Promise<void> {
   <div
     class="flex w-full flex-col items-center justify-center gap-6 rounded-none bg-white px-8 py-4 drop-shadow-2xl sm:mx-16 sm:w-fit sm:rounded-lg sm:px-16 sm:py-8"
   >
-    <p class="text-agros-gray-dark text-center text-lg font-light">
-      Por favor, preencha os campos para fazer o login.
-    </p>
+    <p class="text-agros-gray-dark text-center text-lg font-light">Por favor, preencha os campos para fazer o login.</p>
     <section class="flex w-full flex-col justify-center gap-6 px-8">
       <InputText
         label="Usuário"

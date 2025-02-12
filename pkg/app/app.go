@@ -343,19 +343,18 @@ func QueryAllUsers(ctx *context.Context) ([]db.UserModel, error) {
 	// Query
 	schema := &ctx.Config.Database.Schema
 	query := fmt.Sprintf(
-		`SELECT %s,%s,%s,%s FROM %s.%s WHERE %s <> %s`,
+		`SELECT %s,%s,%s,%s FROM %s.%s WHERE %s <> :admin_id`,
 		schema.UserTable.Columns.UserId,
 		schema.UserTable.Columns.Username,
 		schema.UserTable.Columns.Name,
 		schema.UserTable.Columns.UpdatedAt,
 		schema.Name,
 		schema.UserTable.Name,
-		schema.UserTable.Columns.Username,
-		ctx.Config.AdminUsername,
+		schema.UserTable.Columns.UserId,
 	)
 
 	// Obtenção das linhas
-	rows, err := ctx.DB.Query(query)
+	rows, err := ctx.DB.Query(query, sql.Named("admin_id", ctx.AdminId.String()))
 	if err != nil {
 		return users, fmt.Errorf("não foi possível obter os usuários")
 	}

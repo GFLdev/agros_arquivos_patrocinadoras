@@ -11,7 +11,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <RouterView class="font-lato" />
+  <RouterView />
 </template>
 
 <style scoped></style>

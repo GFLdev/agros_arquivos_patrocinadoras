@@ -17,7 +17,7 @@ const (
 // LoginReq representa os dados necessários para autenticação de um usuário.
 type LoginReq struct {
 	// Username especifica o nome de usuário para autenticação.
-	Username string `json:"username" validate:"required;"`
+	Username string `json:"username" validate:"required"`
 	// Password especifica a senha para autenticação.
 	Password string `json:"password" validate:"required"`
 }
