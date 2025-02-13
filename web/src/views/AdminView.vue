@@ -4,6 +4,7 @@ import AccordionComponent from '@/components/generic/AccordionComponent.vue'
 import { onBeforeMount, ref } from 'vue'
 import type { CategModel, FileModel, UserModel } from '@/@types/Responses.ts'
 import { getAllCategories, getAllFiles, getAllUsers } from '@/services/queries.ts'
+import AddButton from '@/components/admin/AddButton.vue'
 
 const users = ref<UserModel[] | null>(null)
 const categs = ref<Map<string, CategModel[] | null>>(new Map<string, CategModel[] | null>())
@@ -37,6 +38,26 @@ async function handleGetFiles(userId: string, categId: string) {
   files.value.set(userId, data)
   fetched.value.add(categId)
 }
+
+// Função para abrir janela de atualização de usuário
+async function handleUpdateUser(userId: string) {
+  console.log('update user ' + userId)
+}
+
+// Função para abrir janela de atualização de categoria
+async function handleUpdateCategory(userId: string, categId: string) {
+  console.log('update category ' + userId + ' ' + categId)
+}
+
+// Função para abrir janela de exclusão de usuário
+async function handleDeleteUser(userId: string) {
+  console.log('delete user ' + userId)
+}
+
+// Função para abrir janela de exclusão de categoria
+async function handleDeleteCategory(userId: string, categId: string) {
+  console.log('delete category ' + userId + ' ' + categId)
+}
 </script>
 
 <template>
@@ -52,29 +73,49 @@ async function handleGetFiles(userId: string, categId: string) {
         pretium mi. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
       </p>
     </section>
-    <!-- TODO: Accordion de usuários -->
-    <AccordionComponent v-for="user in users" :key="user.user_id">
-      <template #header>
-        <div :onmouseover="() => handleGetCategories(user.user_id)">{{ user.name }}</div>
-      </template>
-      <template #content>
-        <!-- TODO: Accordion de categorias -->
-        <AccordionComponent v-for="categ in categs.get(user.user_id)" :key="categ.categ_id">
-          <template #header>
-            <div :onmouseover="() => handleGetFiles(user.user_id, categ.categ_id)">{{ categ.name }}</div>
-          </template>
-          <template #content>
-            <!-- TODO: Accordion de arquivos -->
-            <AccordionComponent v-for="file in files.get(categ.categ_id)" :key="file.file_id">
-              <template #header>{{ file.name }}</template>
-              <template #content></template>
-            </AccordionComponent>
-            <!-- TODO: Botão de criar arquivo -->
-          </template>
-        </AccordionComponent>
-        <!-- TODO: Botão de criar categoria -->
-      </template>
-    </AccordionComponent>
-    <!-- TODO: Botão de criar usuário -->
+    <section class="flex w-full max-w-3xl flex-col items-center justify-center">
+      <!-- Accordion de usuários -->
+      <AccordionComponent
+        v-for="(user, u_index) in users"
+        class="z-20"
+        :key="user.user_id"
+        :title="user.name"
+        :admin="true"
+        :first="u_index === 0"
+        :last="!!users && u_index == users.length - 1"
+        :edit-handler="() => handleUpdateUser(user.user_id)"
+        :delete-handler="() => handleDeleteUser(user.user_id)"
+        :onmouseover="() => handleGetCategories(user.user_id)"
+      >
+        <template #content>
+          <!-- Accordion de categorias -->
+          <AccordionComponent
+            v-for="(categ, c_index) in categs.get(user.user_id)"
+            class="z-10"
+            :key="categ.categ_id"
+            :title="categ.name"
+            :admin="true"
+            :first="c_index === 0"
+            :last="!!users && c_index == users.length - 1"
+            :edit-handler="() => handleUpdateCategory(user.user_id, categ.categ_id)"
+            :delete-handler="() => handleDeleteCategory(user.user_id, categ.categ_id)"
+            :onmouseover="() => handleGetFiles(user.user_id, categ.categ_id)"
+          >
+            <template #content>
+              <!-- TODO: Container de arquivos -->
+              <div v-for="file in files.get(categ.categ_id)" :key="file.file_id">
+                <span>{{ file.name }}</span>
+              </div>
+              <!-- Botão de criar arquivo -->
+              <AddButton text="Novo arquivo" />
+            </template>
+          </AccordionComponent>
+          <!-- Botão de criar categoria -->
+          <AddButton text="Nova categoria" />
+        </template>
+      </AccordionComponent>
+    </section>
+    <!-- Botão de criar usuário -->
+    <AddButton text="Novo usuário" class="w-full max-w-3xl" />
   </main>
 </template>

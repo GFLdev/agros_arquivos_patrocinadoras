@@ -10,6 +10,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const token = ref<string | null>(localStorage.getItem('token'))
   const user = ref<UserData | null>(null)
+  const loggedIn = ref<boolean>(false)
 
   // Função para salvar o token no estado e no localStorage
   function setToken(newToken: string | null) {
@@ -44,8 +45,10 @@ export const useAuthStore = defineStore('auth', () => {
 
       if (admin) {
         await router.push({ name: 'admin', replace: true })
+        loggedIn.value = true
       } else if (id) {
         await router.push({ name: 'user', params: { id: id }, replace: true })
+        loggedIn.value = true
       } else {
         console.error('Falha ao identificar usuário')
         await router.push({ name: 'login', replace: true })
@@ -72,6 +75,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     token,
     user,
+    loggedIn,
     setToken,
     getSession,
     logout,

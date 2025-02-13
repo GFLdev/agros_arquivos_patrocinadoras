@@ -81,14 +81,14 @@ async function handleSignIn(): Promise<void> {
     </section>
     <button
       type="button"
-      :class="`text-dark focus-visible:outline-dark ${loading ? 'disabled:bg-dark disabled:text-white' : ''} focus-visible:outline-offset inline-flex items-center gap-x-2 rounded-md px-3 py-1.5 text-base shadow-sm transition duration-200 ease-in-out focus:-outline-offset-2 focus-visible:outline focus-visible:outline-2 enabled:hover:bg-dark enabled:hover:text-white`"
+      class="focus-visible:outline-offset inline-flex items-center gap-x-2 rounded-md px-3 py-1.5 text-base text-dark shadow-sm transition duration-200 ease-in-out focus:-outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-dark enabled:hover:bg-dark enabled:hover:text-white disabled:bg-dark disabled:text-white"
       :disabled="!username || !passwd || loading"
       @click="handleSignIn"
     >
       <PhSignIn v-if="!loading" class="size-5" aria-hidden="true" />
       <PhCircleNotch v-else class="size-5 animate-spin" aria-hidden="true" />
       <span v-if="!loading">Entrar</span>
-      <span v-else>Entrar</span>
+      <span v-else>Entrando</span>
     </button>
   </div>
 </template>
