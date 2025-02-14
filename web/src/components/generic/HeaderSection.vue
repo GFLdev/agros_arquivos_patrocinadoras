@@ -7,7 +7,7 @@ const authStore = useAuthStore()
 </script>
 
 <template>
-  <header class="sticky top-0 z-10 bg-gradient-90 from-secondary to-primary font-lato">
+  <header class="animate-open-with-fade sticky top-0 z-30 bg-gradient-90 from-secondary to-primary font-lato">
     <section
       class="grid h-full w-full max-w-[1620px] grid-cols-2 items-center justify-between px-8 py-4 sm:grid-cols-3"
     >

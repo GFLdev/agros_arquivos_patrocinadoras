@@ -8,3 +8,13 @@ export interface DownloadRequest {
   category: string
   year: number
 }
+
+export interface UserRequest {
+  username: string
+  name: string
+  password: string
+}
+
+export interface CategRequest {
+  name: string
+}

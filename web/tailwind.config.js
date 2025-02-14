@@ -56,10 +56,34 @@ export default {
             opacity: 0,
           },
         },
+        'open-with-fade': {
+          '0%': {
+            opacity: 0,
+            visibility: 'hidden',
+          },
+          '0.01%': {
+            visibility: 'visible',
+          },
+          '100%': {
+            opacity: 1,
+          },
+        },
+        'close-with-fade': {
+          '0%': {
+            opacity: 1,
+            visibility: 'visible',
+          },
+          '100%': {
+            opacity: 0,
+            visibility: 'hidden',
+          },
+        },
       },
       animation: {
         'enter-from-top': 'enter-from-top 300ms ease-in-out forwards',
         'exit-to-top': 'exit-to-top 300ms ease-in-out forwards',
+        'open-with-fade': 'open-with-fade 200ms ease-in-out forwards',
+        'close-with-fade': 'close-with-fade 200ms ease-in-out forwards',
       },
     },
   },

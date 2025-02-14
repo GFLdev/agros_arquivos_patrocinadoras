@@ -15,6 +15,7 @@ const props = defineProps({
   disabled: Boolean,
   required: Boolean,
   showable: Boolean,
+  matched: Boolean,
 })
 
 const model = defineModel<string | null | undefined>()
@@ -35,7 +36,7 @@ onMounted(() => {
       <input
         name="passwd"
         id="passwd"
-        :class="`peer col-start-1 row-start-1 block w-full bg-white py-1.5 ${leftInnerIcon ? 'pl-10' : 'pl-3'} ${showable ? 'rounded-l-md' : 'rounded-md'} pr-3 text-base text-gray focus:text-dark outline outline-1 -outline-offset-1 outline-gray placeholder:text-gray focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-dark sm:text-sm/6`"
+        :class="`peer col-start-1 row-start-1 block w-full bg-white py-1.5 ${leftInnerIcon ? 'pl-10' : 'pl-3'} ${showable ? 'rounded-l-md' : 'rounded-md'} pr-3 text-base text-gray outline outline-1 -outline-offset-1 outline-gray placeholder:text-gray focus:text-dark focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-dark sm:text-sm/6`"
         :placeholder="placeholder"
         v-model="model"
         :disabled="disabled"

@@ -7,6 +7,7 @@ import type { LoginRequest } from '@/@types/Requests.ts'
 import apiClient from '@/services/axios.ts'
 import type { AxiosError } from 'axios'
 import { useAuthStore } from '@/stores/authStore.ts'
+import { validatePassword, validateUsername } from '@/utils/validate.ts'
 
 const authStore = useAuthStore()
 
@@ -56,7 +57,7 @@ async function handleSignIn(): Promise<void> {
 </script>
 
 <template>
-  <div
+  <form
     class="flex w-full flex-col items-center justify-center gap-6 rounded-none bg-white px-8 py-4 drop-shadow-2xl sm:mx-16 sm:w-fit sm:rounded-lg sm:px-16 sm:py-8"
   >
     <p class="text-agros-gray-dark text-center text-lg font-light">Por favor, preencha os campos para fazer o login.</p>
@@ -71,18 +72,25 @@ async function handleSignIn(): Promise<void> {
       />
       <InputPassword
         label="Senha"
-        placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;"
+        placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;"
         v-model="passwd"
         :disabled="loading"
         :left-inner-icon="PhPassword"
         showable
         required
       />
+      <div
+        v-if="!validateUsername(username) || !validatePassword(passwd)"
+        class="w-full text-center text-sm font-light"
+      >
+        <p v-if="!validateUsername(username)">O usuário deve ter entre 4 e 16 caracteres</p>
+        <p v-if="!validatePassword(passwd)">A senha deve ter pelo menos 4 caracteres</p>
+      </div>
     </section>
     <button
-      type="button"
+      type="submit"
       class="focus-visible:outline-offset inline-flex items-center gap-x-2 rounded-md px-3 py-1.5 text-base text-dark shadow-sm transition duration-200 ease-in-out focus:-outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-dark enabled:hover:bg-dark enabled:hover:text-white disabled:bg-dark disabled:text-white"
-      :disabled="!username || !passwd || loading"
+      :disabled="!validateUsername(username) || !validatePassword(passwd) || loading"
       @click="handleSignIn"
     >
       <PhSignIn v-if="!loading" class="size-5" aria-hidden="true" />
@@ -90,7 +98,7 @@ async function handleSignIn(): Promise<void> {
       <span v-if="!loading">Entrar</span>
       <span v-else>Entrando</span>
     </button>
-  </div>
+  </form>
 </template>
 
 <style scoped>
