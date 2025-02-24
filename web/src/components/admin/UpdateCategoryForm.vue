@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { PhFolder, PhFolderPlus, PhXCircle } from '@phosphor-icons/vue'
+import { PhFolder, PhPencil, PhUser, PhXCircle } from '@phosphor-icons/vue'
 import InputText from '@/components/generic/InputText.vue'
 import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import PopupWindow from '@/components/generic/PopupWindow.vue'
-import type { CategRequest } from '@/@types/Requests.ts'
-import { type PropType, ref, watch, watchEffect } from 'vue'
-import { createCategory } from '@/services/queries.ts'
-import type { UserModel } from '@/@types/Responses.ts'
+import type { UpdateCategRequest } from '@/@types/Requests.ts'
+import { computed, onMounted, type PropType, ref, watch, watchEffect } from 'vue'
+import type { CategModel } from '@/@types/Responses.ts'
+import InputList from '@/components/generic/InputList.vue'
+import { updateCategory } from '@/services/queries.ts'
+import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
 import { codeToAlertType } from '@/utils/modals.ts'
-import PopupAlert from '@/components/generic/PopupAlert.vue'
 
-defineProps({
-  user: {
-    type: Object as PropType<UserModel>,
+const props = defineProps({
+  categ: {
+    type: Object as PropType<CategModel>,
+    required: true,
+  },
+  users: {
+    type: Map<string, string>,
     required: true,
   },
 })
@@ -22,6 +27,7 @@ defineProps({
 const emits = defineEmits(['submitted'])
 
 // Formulário
+const selectedUser = ref<string>(props.categ.user_id)
 const name = ref<string>('')
 
 // Validações
@@ -46,20 +52,21 @@ function handleAlert(text: string, type: AlertType = AlertType.Info, duration: n
   showAlert.value = true
 }
 
-// Função para abrir janela de criação de categoria
-async function handleCreateCategory(userId: string) {
-  if (!name.value) {
+// Função para abrir janela de atualização de categoria
+async function handleUpdateCategory(userId: string, categId: string) {
+  if (!formValid.value) {
     handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
   }
   loading.value = true
 
-  const body: CategRequest = {
+  const body: UpdateCategRequest = {
+    user_id: selectedUser.value,
     name: name.value,
   }
 
   try {
-    const res = await createCategory(userId, body)
+    const res = await updateCategory(userId, categId, body)
     handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
@@ -75,10 +82,17 @@ async function handleCreateCategory(userId: string) {
 function reset() {
   loading.value = false
   name.value = ''
+  selectedUser.value = computed(() => props.categ.user_id).value
 }
 
+onMounted(() => {
+  selectedUser.value = props.categ.user_id
+})
+
 watchEffect(() => {
-  filled.value = name.value.length > 0
+  const u = selectedUser.value !== props.categ.user_id
+  const n = name.value.length > 0
+  filled.value = u || n
   formValid.value = filled.value
 })
 
@@ -94,20 +108,31 @@ watch(
 </script>
 
 <template>
-  <PopupWindow :title="`Criar nova categoria`" v-model="showModel">
-    <form class="flex flex-col gap-4 space-y-4 px-8 py-4" @submit.prevent="() => handleCreateCategory(user.user_id)">
+  <PopupWindow :title="`Editar categoria`" v-model="showModel">
+    <form
+      class="flex flex-col gap-4 space-y-4 px-8 py-4"
+      @submit.prevent="() => handleUpdateCategory(categ.user_id, categ.categ_id)"
+    >
       <div class="flex w-full flex-col gap-4">
         <!-- Campos do formulário -->
+        <InputList
+          :values="users"
+          label="Usuário"
+          v-model="selectedUser"
+          :selected="categ.user_id"
+          :left-inner-icon="PhUser"
+          :required="false"
+        />
         <InputText
-          placeholder="Nome da categoria"
+          :placeholder="categ.name"
           label="Nome"
           v-model="name"
           :left-inner-icon="PhFolder"
-          :required="true"
+          :required="false"
         />
         <!-- Avisos -->
         <div v-if="!formValid" class="w-full text-center text-sm font-light">
-          <p v-if="!filled">Preencha todos os campos</p>
+          <p v-if="!filled">Preencha ao menos um campo</p>
         </div>
       </div>
       <div class="flex w-full flex-row items-center justify-end gap-4">
@@ -119,11 +144,11 @@ watch(
           :left-inner-icon="PhXCircle"
         />
         <SubmitButton
-          text="Criar"
-          loading-text="Criando"
+          text="Editar"
+          loading-text="Editando"
           :loading="loading"
           :disabled="loading || !formValid"
-          :left-inner-icon="PhFolderPlus"
+          :left-inner-icon="PhPencil"
         />
       </div>
     </form>

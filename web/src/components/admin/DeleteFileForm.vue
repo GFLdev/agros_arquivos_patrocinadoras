@@ -1,18 +1,22 @@
 <script setup lang="ts">
 import PopupWindow from '@/components/generic/PopupWindow.vue'
-import { PhUserMinus, PhXCircle } from '@phosphor-icons/vue'
+import { PhFileMinus, PhXCircle } from '@phosphor-icons/vue'
 import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import { type PropType, ref } from 'vue'
-import { deleteUser } from '@/services/queries.ts'
-import type { UserModel } from '@/@types/Responses.ts'
+import { deleteFile } from '@/services/queries.ts'
+import type { CategModel, FileModel } from '@/@types/Responses.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
 import { codeToAlertType } from '@/utils/modals.ts'
 
 defineProps({
-  user: {
-    type: Object as PropType<UserModel>,
+  categ: {
+    type: Object as PropType<CategModel>,
+    required: true,
+  },
+  file: {
+    type: Object as PropType<FileModel>,
     required: true,
   },
 })
@@ -39,12 +43,12 @@ function handleAlert(text: string, type: AlertType = AlertType.Info, duration: n
   showAlert.value = true
 }
 
-// Função para abrir janela de exclusão de usuário
-async function handleDeleteUser(userId: string) {
+// Função para abrir janela de exclusão de arquivo
+async function handleDeleteFile(userId: string, categId: string, fileId: string) {
   loading.value = true
 
   try {
-    const res = await deleteUser(userId)
+    const res = await deleteFile(userId, categId, fileId)
     handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
@@ -58,11 +62,14 @@ async function handleDeleteUser(userId: string) {
 </script>
 
 <template>
-  <PopupWindow :title="`Excluir usuário`" v-model="showModel">
-    <form class="flex flex-col gap-4 space-y-4 px-8 py-4" @submit.prevent="() => handleDeleteUser(user.user_id)">
+  <PopupWindow :title="`Excluir arquivo`" v-model="showModel">
+    <form
+      class="flex flex-col gap-4 space-y-4 px-8 py-4"
+      @submit.prevent="() => handleDeleteFile(categ.user_id, file.categ_id, file.file_id)"
+    >
       <div class="w-full text-center font-light">
         <p>
-          Deseja realmente excluir o usuário<br /><b>{{ user.name }}</b
+          Deseja realmente excluir o arquivo<br /><b>{{ file.name }}</b
           >?
         </p>
         <br />
@@ -81,7 +88,7 @@ async function handleDeleteUser(userId: string) {
           loading-text="Excluindo"
           :loading="loading"
           :disabled="loading"
-          :left-inner-icon="PhUserMinus"
+          :left-inner-icon="PhFileMinus"
         />
       </div>
     </form>

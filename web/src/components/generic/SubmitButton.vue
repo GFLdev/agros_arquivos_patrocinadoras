@@ -7,14 +7,12 @@ defineProps({
   loadingText: String,
   disabled: Boolean,
   leftInnerIcon: Object,
-  onClick: Function,
 })
 </script>
 
 <template>
   <button
     type="submit"
-    @click.prevent="onClick !== undefined && onClick()"
     :disabled="disabled"
     class="focus-visible:outline-offset inline-flex items-center gap-x-2 rounded-md bg-primary px-3 py-1.5 text-white shadow-md drop-shadow-md transition duration-200 ease-in-out focus:-outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-dark enabled:hover:bg-opacity-80 disabled:bg-dark disabled:bg-opacity-50"
   >

@@ -1,17 +1,25 @@
 <script setup lang="ts">
-import { PhIdentificationBadge, PhPassword, PhUser, PhUserPlus, PhXCircle } from '@phosphor-icons/vue'
+import { PhIdentificationBadge, PhPassword, PhPencil, PhUser, PhXCircle } from '@phosphor-icons/vue'
 import InputPassword from '@/components/generic/InputPassword.vue'
 import InputText from '@/components/generic/InputText.vue'
 import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import PopupWindow from '@/components/generic/PopupWindow.vue'
 import type { UserRequest } from '@/@types/Requests.ts'
-import { ref, watch, watchEffect } from 'vue'
+import type { UserModel } from '@/@types/Responses.ts'
+import { type PropType, ref, watch, watchEffect } from 'vue'
 import { validatePassword, validateUsername } from '@/utils/validate.ts'
-import { createUser } from '@/services/queries.ts'
+import { updateUser } from '@/services/queries.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
 import { codeToAlertType } from '@/utils/modals.ts'
+
+defineProps({
+  user: {
+    type: Object as PropType<UserModel>,
+    required: true,
+  },
+})
 
 const emits = defineEmits(['submitted'])
 
@@ -44,8 +52,8 @@ function handleAlert(text: string, type: AlertType = AlertType.Info, duration: n
   showAlert.value = true
 }
 
-// Função para abrir janela de criação de usuário
-async function handleCreateUser() {
+// Função para abrir janela de atualização de usuário
+async function handleUpdateUser(userId: string) {
   if (!formValid.value) {
     handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
@@ -59,7 +67,7 @@ async function handleCreateUser() {
   }
 
   try {
-    const res = await createUser(body)
+    const res = await updateUser(userId, body)
     handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
@@ -90,10 +98,19 @@ watchEffect(() => {
   const n = name.value.length > 0
   const p = passwd.value.length > 0
   const cp = confirmPasswd.value.length > 0
-  const validLengths = validateUsername(username.value) && validatePassword(passwd.value)
 
-  filled.value = u && n && p && cp
-  matched.value = checkPasswords()
+  filled.value = u || n || p || cp
+  matched.value = true
+
+  let validLengths = true
+  if (p || cp) {
+    matched.value = checkPasswords()
+    validLengths &&= validatePassword(passwd.value)
+  }
+  if (u) {
+    validLengths &&= validateUsername(username.value)
+  }
+
   formValid.value = filled.value && matched.value && validLengths
 })
 
@@ -109,23 +126,23 @@ watch(
 </script>
 
 <template>
-  <PopupWindow :title="`Criar novo usuário`" v-model="showModel">
-    <form class="flex flex-col gap-4 space-y-4 px-8 py-4" @submit.prevent="handleCreateUser">
+  <PopupWindow :title="`Editar usuário`" v-model="showModel">
+    <form class="flex flex-col gap-4 space-y-4 px-8 py-4" @submit.prevent="() => handleUpdateUser(user.user_id)">
       <div class="flex w-full flex-col gap-4">
         <!-- Campos do formulário -->
         <InputText
-          placeholder="Nome de usuário"
+          :placeholder="user.username"
           label="Usuário"
           v-model="username"
           :left-inner-icon="PhIdentificationBadge"
-          :required="true"
+          :required="false"
         />
         <InputText
-          placeholder="Nome Completo"
+          :placeholder="user.name"
           label="Nome Completo"
           v-model="name"
           :left-inner-icon="PhUser"
-          :required="true"
+          :required="false"
         />
         <InputPassword
           placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;"
@@ -133,7 +150,7 @@ watch(
           v-model="passwd"
           :left-inner-icon="PhPassword"
           :showable="true"
-          :required="true"
+          :required="false"
         />
         <InputPassword
           placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;"
@@ -141,14 +158,14 @@ watch(
           v-model="confirmPasswd"
           :left-inner-icon="PhPassword"
           :showable="true"
-          :required="true"
+          :required="!!passwd"
         />
         <!-- Avisos -->
         <div v-if="!formValid" class="w-full text-center text-sm font-light">
-          <p v-if="!filled">Preencha todos os campos</p>
-          <p v-if="!validateUsername(username)">O usuário deve ter entre 4 e 16 caracteres</p>
-          <p v-if="!validatePassword(passwd)">A senha deve ter pelo menos 4 caracteres</p>
-          <p v-else-if="!matched">As senhas devem sem iguais</p>
+          <p v-if="!filled">Preencha ao menos um campo</p>
+          <p v-if="username.length > 0 && !validateUsername(username)">O usuário deve ter entre 4 e 16 caracteres</p>
+          <p v-if="passwd.length > 0 && !validatePassword(passwd)">A senha deve ter pelo menos 4 caracteres</p>
+          <p v-else-if="passwd.length > 0 && !matched">As senhas devem sem iguais</p>
         </div>
       </div>
       <div class="flex w-full flex-row items-center justify-end gap-4">
@@ -160,11 +177,11 @@ watch(
           :left-inner-icon="PhXCircle"
         />
         <SubmitButton
-          text="Criar"
-          loading-text="Criando"
+          text="Editar"
+          loading-text="Editando"
           :loading="loading"
           :disabled="loading || !formValid"
-          :left-inner-icon="PhUserPlus"
+          :left-inner-icon="PhPencil"
         />
       </div>
     </form>

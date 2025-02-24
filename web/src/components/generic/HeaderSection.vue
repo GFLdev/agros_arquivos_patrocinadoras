@@ -2,12 +2,15 @@
 import Logo from '/logo.svg'
 import { PhSignOut } from '@phosphor-icons/vue'
 import { useAuthStore } from '@/stores/authStore.ts'
+defineProps({
+  title: String,
+})
 
 const authStore = useAuthStore()
 </script>
 
 <template>
-  <header class="animate-open-with-fade sticky top-0 z-30 bg-gradient-90 from-secondary to-primary font-lato">
+  <header class="sticky top-0 z-10 animate-open-with-fade bg-gradient-90 from-secondary to-primary font-lato">
     <section
       class="grid h-full w-full max-w-[1620px] grid-cols-2 items-center justify-between px-8 py-4 sm:grid-cols-3"
     >
@@ -15,7 +18,7 @@ const authStore = useAuthStore()
         <img :src="Logo" class="w-[200px]" alt="Logo Agros" />
       </div>
       <div class="text-center sm:justify-self-center">
-        <h1 class="text-2xl text-white sm:text-3xl">Espaço Patrocinadora</h1>
+        <h1 class="text-2xl text-white sm:text-3xl">{{ title ?? 'Espaço Patrocinadora' }}</h1>
       </div>
       <div class="justify-self-end">
         <button

@@ -1,21 +1,24 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { PhCaretDown, PhPencil, PhTrash } from '@phosphor-icons/vue'
 
-defineProps({
+const props = defineProps({
   title: String,
   admin: Boolean,
   first: Boolean,
   last: Boolean,
   editHandler: Function,
   deleteHandler: Function,
+  contentHeight: Number,
 })
 
 const open = ref<boolean>(false)
-const contentHeight = ref('0px')
+const maxContentHeight = ref<number>(0)
 
 const contentNode = ref<Node | null>(null)
 const observer = ref<MutationObserver | null>(null)
+
+const heightModel = defineModel<number | null>()
 
 const toggle = () => {
   open.value = !open.value
@@ -26,14 +29,14 @@ async function adjustHeight() {
   await nextTick()
   if (contentNode.value) {
     const el = contentNode.value as HTMLElement
-    contentHeight.value = open.value ? `${el.scrollHeight}px` : '0px'
-    console.log(contentHeight.value)
+    const childHeight: number = computed(() => props.contentHeight).value ?? 0
+    maxContentHeight.value = open.value ? el.scrollHeight + childHeight : 0
+    heightModel.value = maxContentHeight.value
   }
 }
 
 onMounted(() => {
   observer.value = new MutationObserver(async () => {
-    await nextTick()
     await adjustHeight()
   })
   if (contentNode.value) {
@@ -59,12 +62,14 @@ onBeforeUnmount(() => {
     :class="`${first ? 'rounded-t-md' : ''} ${last ? 'rounded-b-md' : ''}`"
   >
     <div class="cursor-pointer bg-primary text-center text-white shadow-lg drop-shadow-lg">
-      <div class="flex w-full flex-row items-center justify-between gap-8 px-4 py-2" @click.prevent="toggle">
-        <div class="justify-self-start">
+      <div class="grid w-full grid-flow-col grid-cols-5 items-center gap-8 px-4 py-2" @click.prevent="toggle">
+        <div class="col-span-1 justify-self-start">
           <PhCaretDown class="size-5 transition-all duration-300" :class="open ? 'rotate-180' : ''" />
         </div>
-        <div class="mb-1 select-none justify-self-center text-wrap">{{ title }}</div>
-        <div class="flex flex-row gap-x-2 justify-self-end" v-if="admin">
+        <div class="col-span-3 mb-1 select-none justify-self-center text-wrap text-center font-light">
+          <p>{{ title }}</p>
+        </div>
+        <div class="col-span-1 flex flex-row gap-x-2 justify-self-end" v-if="admin">
           <button
             @click.prevent="
               (e) => {
@@ -92,7 +97,7 @@ onBeforeUnmount(() => {
     </div>
     <div
       class="-z-10 overflow-hidden bg-white transition-all duration-300 ease-in-out"
-      :style="{ maxHeight: contentHeight }"
+      :style="{ maxHeight: `${maxContentHeight}px` }"
     >
       <div
         ref="contentNode"

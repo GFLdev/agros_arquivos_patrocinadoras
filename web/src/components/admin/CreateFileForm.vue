@@ -1,20 +1,22 @@
 <script setup lang="ts">
-import { PhFolder, PhFolderPlus, PhXCircle } from '@phosphor-icons/vue'
+import { PhFile, PhFilePlus, PhFolderOpen, PhXCircle } from '@phosphor-icons/vue'
 import InputText from '@/components/generic/InputText.vue'
 import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import PopupWindow from '@/components/generic/PopupWindow.vue'
-import type { CategRequest } from '@/@types/Requests.ts'
+import type { FileRequest } from '@/@types/Requests.ts'
 import { type PropType, ref, watch, watchEffect } from 'vue'
-import { createCategory } from '@/services/queries.ts'
-import type { UserModel } from '@/@types/Responses.ts'
+import InputFile from '@/components/generic/InputFile.vue'
+import { fileIcon, toBase64 } from '@/utils/file.ts'
+import { createFile } from '@/services/queries.ts'
+import type { CategModel } from '@/@types/Responses.ts'
 import { AlertType } from '@/@types/Enumerations.ts'
-import { codeToAlertType } from '@/utils/modals.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
+import { codeToAlertType } from '@/utils/modals.ts'
 
 defineProps({
-  user: {
-    type: Object as PropType<UserModel>,
+  categ: {
+    type: Object as PropType<CategModel>,
     required: true,
   },
 })
@@ -23,6 +25,8 @@ const emits = defineEmits(['submitted'])
 
 // Formulário
 const name = ref<string>('')
+const extension = ref<string>('')
+const inFile = ref<File>(new File([], ''))
 
 // Validações
 const loading = ref<boolean>(false)
@@ -46,20 +50,25 @@ function handleAlert(text: string, type: AlertType = AlertType.Info, duration: n
   showAlert.value = true
 }
 
-// Função para abrir janela de criação de categoria
-async function handleCreateCategory(userId: string) {
-  if (!name.value) {
+// Função para abrir janela de criação de arquivo
+async function handleCreateFile(userId: string, categId: string) {
+  if (!formValid.value) {
     handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
   }
+
+  extension.value = '.' + (inFile.value.name.split('.').pop() ?? 'bin')
   loading.value = true
 
-  const body: CategRequest = {
+  const body: FileRequest = {
     name: name.value,
+    extension: extension.value,
+    mimetype: inFile.value.type,
+    content: (await toBase64(inFile.value)).split(',')[1], // apenas os bytes base64
   }
 
   try {
-    const res = await createCategory(userId, body)
+    const res = await createFile(userId, categId, body)
     handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
@@ -71,14 +80,23 @@ async function handleCreateCategory(userId: string) {
   }
 }
 
+// Função para verificar se 'file' está vazio
+function isFileEmpty(): boolean {
+  return inFile.value.size === 0 && inFile.value.name === ''
+}
+
 // Função para reset das variáveis reativas
 function reset() {
   loading.value = false
   name.value = ''
+  extension.value = ''
+  inFile.value = new File([], '')
 }
 
 watchEffect(() => {
-  filled.value = name.value.length > 0
+  const n = name.value.length > 0
+  const f = !isFileEmpty()
+  filled.value = n && f
   formValid.value = filled.value
 })
 
@@ -94,15 +112,25 @@ watch(
 </script>
 
 <template>
-  <PopupWindow :title="`Criar nova categoria`" v-model="showModel">
-    <form class="flex flex-col gap-4 space-y-4 px-8 py-4" @submit.prevent="() => handleCreateCategory(user.user_id)">
+  <PopupWindow :title="`Criar novo arquivo`" v-model="showModel">
+    <form
+      class="flex flex-col gap-4 space-y-4 px-8 py-4"
+      @submit.prevent="() => handleCreateFile(categ.user_id, categ.categ_id)"
+    >
       <div class="flex w-full flex-col gap-4">
         <!-- Campos do formulário -->
         <InputText
-          placeholder="Nome da categoria"
+          placeholder="Nome do arquivo"
           label="Nome"
           v-model="name"
-          :left-inner-icon="PhFolder"
+          :left-inner-icon="PhFile"
+          :required="true"
+        />
+        <InputFile
+          placeholder="Selecione o arquivo"
+          label="Arquivo"
+          v-model="inFile"
+          :left-inner-icon="isFileEmpty() ? PhFolderOpen : fileIcon(inFile.type)"
           :required="true"
         />
         <!-- Avisos -->
@@ -123,7 +151,7 @@ watch(
           loading-text="Criando"
           :loading="loading"
           :disabled="loading || !formValid"
-          :left-inner-icon="PhFolderPlus"
+          :left-inner-icon="PhFilePlus"
         />
       </div>
     </form>

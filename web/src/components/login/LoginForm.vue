@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { PhSignIn, PhCircleNotch, PhIdentificationCard, PhPassword } from '@phosphor-icons/vue'
+import { PhCircleNotch, PhIdentificationCard, PhPassword, PhSignIn } from '@phosphor-icons/vue'
 import InputText from '@/components/generic/InputText.vue'
 import InputPassword from '@/components/generic/InputPassword.vue'
 import type { LoginRequest } from '@/@types/Requests.ts'
 import apiClient from '@/services/axios.ts'
-import type { AxiosError } from 'axios'
+import type { AxiosError, AxiosResponse } from 'axios'
 import { useAuthStore } from '@/stores/authStore.ts'
 import { validatePassword, validateUsername } from '@/utils/validate.ts'
+import type { LoginResponse } from '@/@types/Responses.ts'
+import { AlertType } from '@/@types/Enumerations.ts'
+import PopupAlert from '@/components/generic/PopupAlert.vue'
 
 const authStore = useAuthStore()
 
@@ -16,10 +19,24 @@ const username = ref<string | null>()
 const passwd = ref<string | null>()
 const loading = ref<boolean>(false)
 
+// Alerta
+const showAlert = ref<boolean>(false)
+const alertType = ref<AlertType>(AlertType.Info)
+const alertText = ref<string>('')
+const alertDuration = ref<number>(3000)
+
+// Gerenciar alerta
+function handleAlert(text: string, type: AlertType = AlertType.Info, duration: number = 3000) {
+  alertText.value = text
+  alertType.value = type
+  alertDuration.value = duration
+  showAlert.value = true
+}
+
 // Função para gerenciar o envio do formulário para autenticação do usuário
 async function handleSignIn(): Promise<void> {
   if (!username.value || !passwd.value) {
-    // TODO: Manipular erro
+    handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
   }
 
@@ -30,25 +47,25 @@ async function handleSignIn(): Promise<void> {
     username: username.value,
     password: passwd.value,
   }
+  authStore.loginBody = body
 
   try {
-    const res = await apiClient.post('/login', JSON.stringify(body))
-    const token = res.data?.token
+    const res: AxiosResponse<LoginResponse> = await apiClient.post('/login', JSON.stringify(body))
+    const token: string = res.data?.token
 
     if (token) {
+      handleAlert('Login realizado com sucesso', AlertType.Success)
       authStore.setToken(token)
       await authStore.getSession()
     } else {
-      console.error('Token não recebido')
+      handleAlert('Token não recebido', AlertType.Error)
     }
   } catch (e: unknown) {
     const error = e as AxiosError
     if (error.response && error.response.status === 401) {
-      // TODO: Exiba uma mensagem amigável para o usuário
-      console.error('Credenciais inválidas')
+      handleAlert('Credenciais inválidas', AlertType.Warning)
     } else {
-      // TODO: Tratar erros de login e exibir mensagens relevantes ao usuário
-      console.error('Erro ao fazer login:', error.message || error)
+      handleAlert(`Erro ao fazer login: ${error.message || error}`, AlertType.Error)
     }
   } finally {
     loading.value = false
@@ -99,6 +116,7 @@ async function handleSignIn(): Promise<void> {
       <span v-else>Entrando</span>
     </button>
   </form>
+  <PopupAlert :text="alertText" :type="alertType" :duration="alertDuration" v-model="showAlert" />
 </template>
 
 <style scoped>

@@ -3,12 +3,6 @@ export interface LoginRequest {
   password: string
 }
 
-export interface DownloadRequest {
-  user: string
-  category: string
-  year: number
-}
-
 export interface UserRequest {
   username: string
   name: string
@@ -17,4 +11,19 @@ export interface UserRequest {
 
 export interface CategRequest {
   name: string
+}
+
+export interface FileRequest {
+  name: string
+  extension: string
+  mimetype: string
+  content: string
+}
+
+export interface UpdateCategRequest extends CategRequest {
+  user_id: string
+}
+
+export interface UpdateFileRequest extends FileRequest {
+  categ_id: string
 }

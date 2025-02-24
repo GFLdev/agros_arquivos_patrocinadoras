@@ -12,17 +12,11 @@ const router = createRouter({
     {
       path: '/admin',
       name: 'admin',
-      // meta: {
-      //   requiredAuth: true,
-      // },
       component: () => import('@/views/AdminView.vue'),
     },
     {
       path: '/user/:id',
       name: 'user',
-      // meta: {
-      //   requiredAuth: true,
-      // },
       component: () => import('@/views/UserView.vue'),
     },
   ],
