@@ -71,7 +71,7 @@ type UpdateUserReq struct {
 // UpdateCategoryReq representa os dados necessários para atualizar uma categoria.
 type UpdateCategoryReq struct {
 	// UserId especifica o ID do usuário proprietário da categoria.
-	UserId string `json:"userId"`
+	UserId string `json:"user_id"`
 	// Name especifica o novo nome da categoria.
 	Name string `json:"name"`
 }
@@ -79,7 +79,7 @@ type UpdateCategoryReq struct {
 // UpdateFileReq representa os dados necessários para atualizar um arquivo.
 type UpdateFileReq struct {
 	// CategId especifica o ID da categoria associada ao arquivo.
-	CategId string `json:"categId"`
+	CategId string `json:"categ_id"`
 	// Name especifica o novo nome do arquivo.
 	Name string `json:"name"`
 	// Extension especifica a nova extensão do arquivo.

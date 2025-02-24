@@ -479,6 +479,7 @@ func GetAllFiles(c echo.Context) error {
 func GetFileById(c echo.Context) error {
 	// Cabeçalho e contexto da aplicação
 	ctx := context.GetContext(c)
+	c.Response().Header().Add(echo.HeaderContentType, echo.MIMEApplicationJSON)
 
 	// Parâmetros da URL e verificar se usuário, categoria e arquivo existem
 	userId, err := ParseEntityUUID(c, User)
@@ -513,8 +514,7 @@ func GetFileById(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusNotFound, FileNotFoundMessage)
 	}
-	c.Response().Header().Add(echo.HeaderContentType, file.Mimetype)
-	return c.Blob(http.StatusOK, file.Mimetype, file.Blob)
+	return c.JSON(http.StatusOK, file)
 }
 
 // UpdateUserHandler gerencia a atualização dos dados de um usuário existente.

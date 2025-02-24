@@ -54,7 +54,7 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 		ContextMiddleware(ctx),
 		// Middleware para capturar requisições e respostas
 		middleware.BodyDump(func(c echo.Context, reqBody, resBody []byte) {
-			// Filtrar quaisquer senhas para não aparecer nos logs
+			// Filtrar campos para não aparecer nos logs
 			filtered := make([][]byte, 2)
 			bodies := [][]byte{reqBody, resBody}
 			for j, body := range bodies {
@@ -65,6 +65,8 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 
 				if m, ok := i.(map[string]interface{}); ok {
 					delete(m, "password")
+					delete(m, "content")
+					delete(m, "blob")
 				} else {
 					filtered[j] = []byte("")
 				}
