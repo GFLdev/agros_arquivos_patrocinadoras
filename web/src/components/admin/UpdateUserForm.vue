@@ -6,13 +6,13 @@ import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import PopupWindow from '@/components/generic/PopupWindow.vue'
 import type { UserRequest } from '@/@types/Requests.ts'
-import type { UserModel } from '@/@types/Responses.ts'
-import { type PropType, ref, watch, watchEffect } from 'vue'
-import { validatePassword, validateUsername } from '@/utils/validate.ts'
+import type { QueryResponse, UserModel } from '@/@types/Responses.ts'
+import { type EmitFn, type ModelRef, type PropType, type Ref, ref, watch, watchEffect } from 'vue'
+import { checkPasswords, validatePassword, validateUsername } from '@/utils/validate.ts'
 import { updateUser } from '@/services/queries.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
-import { codeToAlertType } from '@/utils/modals.ts'
+import { Alert, codeToAlertType, TRANSITION_DURATION } from '@/utils/modals.ts'
 
 defineProps({
   user: {
@@ -21,108 +21,102 @@ defineProps({
   },
 })
 
-const emits = defineEmits(['submitted'])
+// Emissores
+const emits: EmitFn<'submitted'[]> = defineEmits(['submitted'])
 
 // Formulário
-const username = ref<string>('')
-const name = ref<string>('')
-const passwd = ref<string>('')
-const confirmPasswd = ref<string>('')
+const formUsername: Ref<string> = ref<string>('')
+const formName: Ref<string> = ref<string>('')
+const formPasswd: Ref<string> = ref<string>('')
+const formConfirmPasswd: Ref<string> = ref<string>('')
+
+// Status de carregamento
+const isLoading: Ref<boolean> = ref<boolean>(false)
 
 // Validações
-const loading = ref<boolean>(false)
-const filled = ref<boolean>(false)
-const matched = ref<boolean>(false)
-const formValid = ref<boolean>(false)
-
-// Estado de visibilidade
-const showModel = defineModel<boolean>()
+const isFilled: Ref<boolean> = ref<boolean>(false)
+const isPasswdMatched: Ref<boolean> = ref<boolean>(false)
+const isFormValid: Ref<boolean> = ref<boolean>(false)
 
 // Alerta
-const showAlert = ref<boolean>(false)
-const alertType = ref<AlertType>(AlertType.Info)
-const alertText = ref<string>('')
-const alertDuration = ref<number>(3000)
+const alert: Ref<Alert> = ref<Alert>(new Alert())
 
-// Gerenciar alerta
-function handleAlert(text: string, type: AlertType = AlertType.Info, duration: number = 3000) {
-  alertText.value = text
-  alertType.value = type
-  alertDuration.value = duration
-  showAlert.value = true
+// Estado de visibilidade
+const showModel: ModelRef<boolean | undefined> = defineModel<boolean>()
+
+/**
+ * Redefine o estado das variáveis para seus valores iniciais.
+ *
+ * @return {void} Sem valor de retorno.
+ */
+function reset(): void {
+  isLoading.value = false
+  formUsername.value = ''
+  formName.value = ''
+  formPasswd.value = ''
+  formConfirmPasswd.value = ''
 }
 
-// Função para abrir janela de atualização de usuário
-async function handleUpdateUser(userId: string) {
-  if (!formValid.value) {
-    handleAlert('Campos necessários não preenchidos', AlertType.Warning)
+/**
+ * Lida com a atualização de um usuário enviando uma solicitação para atualizar os detalhes do usuário
+ * e gerenciando a validação do formulário.
+ *
+ * @param {string} userId - O identificador único do usuário a ser atualizado.
+ * @return {Promise<void>} Uma promessa que é resolvida quando o processo de atualização do usuário é concluído.
+ */
+async function handleUpdateUser(userId: string): Promise<void> {
+  isLoading.value = true
+  if (!isFormValid.value) {
+    alert.value.handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
   }
-  loading.value = true
 
-  const body: UserRequest = {
-    username: username.value,
-    name: name.value,
-    password: passwd.value,
+  const body: Partial<UserRequest> = {
+    username: formUsername.value,
+    name: formName.value,
+    password: formPasswd.value,
   }
 
   try {
-    const res = await updateUser(userId, body)
-    handleAlert(res.message, codeToAlertType(res.code))
+    const res: QueryResponse = await updateUser(userId, body)
+    alert.value.handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 
-// Função para verificar se as senhas são iguais
-function checkPasswords(): boolean {
-  return passwd.value === confirmPasswd.value
-}
-
-// Função para reset das variáveis reativas
-function reset() {
-  loading.value = false
-  username.value = ''
-  name.value = ''
-  passwd.value = ''
-  confirmPasswd.value = ''
-}
-
-watchEffect(() => {
-  const u = username.value.length > 0
-  const n = name.value.length > 0
-  const p = passwd.value.length > 0
-  const cp = confirmPasswd.value.length > 0
-
-  filled.value = u || n || p || cp
-  matched.value = true
-
-  let validLengths = true
-  if (p || cp) {
-    matched.value = checkPasswords()
-    validLengths &&= validatePassword(passwd.value)
-  }
-  if (u) {
-    validLengths &&= validateUsername(username.value)
-  }
-
-  formValid.value = filled.value && matched.value && validLengths
-})
-
+// Timeout para homogeneidade com as transições
 watch(
-  () => showModel.value,
-  () => {
-    if (!showModel.value) {
-      // Timeout para homogeneidade com as transições
-      setTimeout(reset, 200)
-    }
+  (): boolean | undefined => showModel.value,
+  (): void => {
+    if (!showModel.value) setTimeout(reset, TRANSITION_DURATION)
   },
 )
+
+// Validações
+watchEffect((): void => {
+  // Verificar preenchimento
+  const u: boolean = (formUsername.value ?? '').length > 0
+  const n: boolean = (formName.value ?? '').length > 0
+  const p: boolean = (formPasswd.value ?? '').length > 0
+  const cp: boolean = (formConfirmPasswd.value ?? '').length > 0
+  isFilled.value = u || n || p || cp
+
+  // Verificar senhas e tamanho dos parâmetros
+  isPasswdMatched.value = true
+  let validLengths: boolean = true
+  if (u) validLengths &&= validateUsername(formUsername.value)
+  if (p || cp) {
+    isPasswdMatched.value = checkPasswords(formPasswd.value, formConfirmPasswd.value)
+    validLengths &&= validatePassword(formPasswd.value)
+  }
+
+  isFormValid.value = isFilled.value && isPasswdMatched.value && validLengths
+})
 </script>
 
 <template>
@@ -133,21 +127,21 @@ watch(
         <InputText
           :placeholder="user.username"
           label="Usuário"
-          v-model="username"
+          v-model="formUsername"
           :left-inner-icon="PhIdentificationBadge"
           :required="false"
         />
         <InputText
           :placeholder="user.name"
           label="Nome Completo"
-          v-model="name"
+          v-model="formName"
           :left-inner-icon="PhUser"
           :required="false"
         />
         <InputPassword
           placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;"
           label="Senha"
-          v-model="passwd"
+          v-model="formPasswd"
           :left-inner-icon="PhPassword"
           :showable="true"
           :required="false"
@@ -155,17 +149,21 @@ watch(
         <InputPassword
           placeholder="&#9679;&#9679;&#9679;&#9679;&#9679;"
           label="Confirmar Senha"
-          v-model="confirmPasswd"
+          v-model="formConfirmPasswd"
           :left-inner-icon="PhPassword"
           :showable="true"
-          :required="!!passwd"
+          :required="!!formPasswd"
         />
         <!-- Avisos -->
-        <div v-if="!formValid" class="w-full text-center text-sm font-light">
-          <p v-if="!filled">Preencha ao menos um campo</p>
-          <p v-if="username.length > 0 && !validateUsername(username)">O usuário deve ter entre 4 e 16 caracteres</p>
-          <p v-if="passwd.length > 0 && !validatePassword(passwd)">A senha deve ter pelo menos 4 caracteres</p>
-          <p v-else-if="passwd.length > 0 && !matched">As senhas devem sem iguais</p>
+        <div v-if="!isFormValid" class="w-full text-center text-sm font-light">
+          <p v-if="!isFilled">Preencha ao menos um campo</p>
+          <p v-if="(formUsername?.length ?? 0) > 0 && !validateUsername(formUsername)">
+            O usuário deve ter entre 4 e 16 caracteres
+          </p>
+          <p v-if="(formPasswd?.length ?? 0) > 0 && !validatePassword(formPasswd)">
+            A senha deve ter pelo menos 4 caracteres
+          </p>
+          <p v-else-if="(formPasswd?.length ?? 0) > 0 && !isPasswdMatched">As senhas devem sem iguais</p>
         </div>
       </div>
       <div class="flex w-full flex-row items-center justify-end gap-4">
@@ -173,20 +171,20 @@ watch(
         <CancelButton
           text="Cancelar"
           :on-click="() => (showModel = false)"
-          :disabled="loading"
+          :disabled="isLoading"
           :left-inner-icon="PhXCircle"
         />
         <SubmitButton
           text="Editar"
           loading-text="Editando"
-          :loading="loading"
-          :disabled="loading || !formValid"
+          :loading="isLoading"
+          :disabled="isLoading || !isFormValid"
           :left-inner-icon="PhPencil"
         />
       </div>
     </form>
   </PopupWindow>
-  <PopupAlert :text="alertText" :type="alertType" :duration="alertDuration" v-model="showAlert" />
+  <PopupAlert :text="alert.text" :type="alert.type" :duration="alert.duration" v-model="alert.show" />
 </template>
 
 <style scoped></style>

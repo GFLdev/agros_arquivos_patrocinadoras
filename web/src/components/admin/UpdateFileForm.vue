@@ -5,17 +5,22 @@ import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
 import PopupWindow from '@/components/generic/PopupWindow.vue'
 import type { UpdateFileRequest } from '@/@types/Requests.ts'
-import { computed, onMounted, type PropType, ref, watch, watchEffect } from 'vue'
-import type { CategModel, FileModel } from '@/@types/Responses.ts'
+import { computed, type EmitFn, type ModelRef, onMounted, type PropType, type Ref, ref, watch, watchEffect } from 'vue'
+import type { CategModel, FileModel, QueryResponse } from '@/@types/Responses.ts'
 import InputList from '@/components/generic/InputList.vue'
 import { updateFile } from '@/services/queries.ts'
 import InputFile from '@/components/generic/InputFile.vue'
 import { fileIcon, toBase64 } from '@/utils/file.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
-import { codeToAlertType } from '@/utils/modals.ts'
+import { Alert, codeToAlertType, TRANSITION_DURATION } from '@/utils/modals.ts'
+import { isFileEmpty } from '@/utils/validate.ts'
 
-const props = defineProps({
+const props: {
+  readonly categ: CategModel
+  readonly file: FileModel
+  readonly categs: Record<string, string>
+} = defineProps({
   categ: {
     type: Object as PropType<CategModel>,
     required: true,
@@ -25,107 +30,109 @@ const props = defineProps({
     required: true,
   },
   categs: {
-    type: Map<string, string>,
+    type: Object as PropType<Record<string, string>>,
     required: true,
   },
 })
 
-const emits = defineEmits(['submitted'])
+// Emissores
+const emits: EmitFn<'submitted'[]> = defineEmits(['submitted'])
 
 // Formulário
-const selectedCateg = ref<string>(props.categ.categ_id)
-const name = ref<string>('')
-const extension = ref<string>('')
-const inFile = ref<File>(new File([], ''))
+const formCateg: Ref<string> = ref<string>(props.categ.categ_id)
+const formName: Ref<string> = ref<string>('')
+const formExtension: Ref<string> = ref<string>('')
+const formFile: Ref<File> = ref<File>(new File([], ''))
+
+// Status de carregamento
+const isLoading: Ref<boolean> = ref<boolean>(false)
 
 // Validações
-const loading = ref<boolean>(false)
-const filled = ref<boolean>(false)
-const formValid = ref<boolean>(false)
-
-// Estado de visibilidade
-const showModel = defineModel<boolean>()
+const isFilled: Ref<boolean> = ref<boolean>(false)
+const isFormValid: Ref<boolean> = ref<boolean>(false)
 
 // Alerta
-const showAlert = ref<boolean>(false)
-const alertType = ref<AlertType>(AlertType.Info)
-const alertText = ref<string>('')
-const alertDuration = ref<number>(3000)
+const alert: Ref<Alert> = ref<Alert>(new Alert())
 
-// Gerenciar alerta
-function handleAlert(text: string, type: AlertType = AlertType.Info, duration: number = 3000) {
-  alertText.value = text
-  alertType.value = type
-  alertDuration.value = duration
-  showAlert.value = true
+// Estado de visibilidade
+const showModel: ModelRef<boolean | undefined> = defineModel<boolean>()
+
+/**
+ * Redefine o estado das variáveis para seus valores iniciais.
+ *
+ * @return {void} Sem valor de retorno.
+ */
+function reset(): void {
+  isLoading.value = false
+  formName.value = ''
+  formExtension.value = ''
+  formFile.value = new File([], '')
+  formCateg.value = computed(() => props.categ.categ_id).value
 }
 
-// Função para abrir janela de atualização de arquivo
-async function handleUpdateFile(userId: string, categId: string, fileId: string) {
-  if (!formValid.value) {
-    handleAlert('Campos necessários não preenchidos', AlertType.Warning)
+/**
+ * Lida com a atualização de um arquivo, validando as entradas do formulário, processando os dados do arquivo,
+ * fazendo uma solicitação à API.
+ *
+ * @param {string} userId - O identificador do usuário que está realizando a atualização.
+ * @param {string} categId - O identificador da categoria à qual o arquivo pertence.
+ * @param {string} fileId - O identificador do arquivo a ser atualizado.
+ * @return {Promise<void>} Uma promessa que é resolvida quando a operação de atualização for concluída.
+ */
+async function handleUpdateFile(userId: string, categId: string, fileId: string): Promise<void> {
+  isLoading.value = true
+  if (!isFormValid.value) {
+    alert.value.handleAlert('Campos necessários não preenchidos', AlertType.Warning)
     return
   }
 
-  extension.value = isFileEmpty() ? '' : '.' + (inFile.value.name.split('.').pop() ?? 'bin')
-  loading.value = true
+  if (!isFileEmpty(formFile.value)) {
+    formExtension.value = '.' + (formFile.value.name.split('.').pop() ?? 'bin')
+  }
 
-  const body: UpdateFileRequest = {
-    categ_id: selectedCateg.value,
-    name: name.value,
-    extension: extension.value,
-    mimetype: inFile.value.type,
-    content: (await toBase64(inFile.value)).split(',')[1], // apenas os bytes base64
+  const body: Partial<UpdateFileRequest> = {
+    categ_id: formCateg.value,
+    name: formName.value,
+    extension: formExtension.value,
+    mimetype: formFile.value.type,
+    content: await toBase64(formFile.value),
   }
 
   try {
-    const res = await updateFile(userId, categId, fileId, body)
-    handleAlert(res.message, codeToAlertType(res.code))
+    const res: QueryResponse = await updateFile(userId, categId, fileId, body)
+    alert.value.handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 
-// Função para verificar se 'file' está vazio
-function isFileEmpty(): boolean {
-  return inFile.value.size === 0 && inFile.value.name === ''
-}
-
-// Função para reset das variáveis reativas
-function reset() {
-  loading.value = false
-  name.value = ''
-  extension.value = ''
-  inFile.value = new File([], '')
-  selectedCateg.value = computed(() => props.categ.categ_id).value
-}
-
+// Selecionar a categoria atual na lista suspensa, na primeira renderização
 onMounted(() => {
-  selectedCateg.value = props.categ.categ_id
+  formCateg.value = props.categ.categ_id
 })
 
-watchEffect(() => {
-  const c = selectedCateg.value !== props.categ.categ_id
-  const n = name.value.length > 0
-  const f = !isFileEmpty()
-  filled.value = c || n || f
-  formValid.value = filled.value
-})
-
+// Timeout para homogeneidade com as transições
 watch(
-  () => showModel.value,
-  () => {
-    if (!showModel.value) {
-      // Timeout para homogeneidade com as transições
-      setTimeout(reset, 200)
-    }
+  (): boolean | undefined => showModel.value,
+  (): void => {
+    if (!showModel.value) setTimeout(reset, TRANSITION_DURATION)
   },
 )
+
+// Validações
+watchEffect((): void => {
+  // Verificar preenchimento
+  const c = formCateg.value !== props.categ.categ_id
+  const n = formName.value.length > 0
+  const f = !isFileEmpty(formFile.value)
+  isFilled.value = c || n || f
+
+  isFormValid.value = isFilled.value
+})
 </script>
 
 <template>
@@ -139,22 +146,28 @@ watch(
         <InputList
           :values="categs"
           label="Categoria"
-          v-model="selectedCateg"
+          v-model="formCateg"
           :selected="categ.categ_id"
           :left-inner-icon="PhFolder"
           :required="false"
         />
-        <InputText :placeholder="file.name" label="Nome" v-model="name" :left-inner-icon="PhFile" :required="false" />
+        <InputText
+          :placeholder="file.name"
+          label="Nome"
+          v-model="formName"
+          :left-inner-icon="PhFile"
+          :required="false"
+        />
         <InputFile
           placeholder="Selecione o arquivo"
           label="Arquivo"
-          v-model="inFile"
-          :left-inner-icon="isFileEmpty() ? PhFolderOpen : fileIcon(inFile.type)"
+          v-model="formFile"
+          :left-inner-icon="isFileEmpty(formFile) ? PhFolderOpen : fileIcon(formFile.type)"
           :required="false"
         />
         <!-- Avisos -->
-        <div v-if="!formValid" class="w-full text-center text-sm font-light">
-          <p v-if="!filled">Preencha ao menos um campo</p>
+        <div v-if="!isFormValid" class="w-full text-center text-sm font-light">
+          <p v-if="!isFilled">Preencha ao menos um campo</p>
         </div>
       </div>
       <div class="flex w-full flex-row items-center justify-end gap-4">
@@ -162,20 +175,20 @@ watch(
         <CancelButton
           text="Cancelar"
           :on-click="() => (showModel = false)"
-          :disabled="loading"
+          :disabled="isLoading"
           :left-inner-icon="PhXCircle"
         />
         <SubmitButton
           text="Editar"
           loading-text="Editando"
-          :loading="loading"
-          :disabled="loading || !formValid"
+          :loading="isLoading"
+          :disabled="isLoading || !isFormValid"
           :left-inner-icon="PhPencil"
         />
       </div>
     </form>
   </PopupWindow>
-  <PopupAlert :text="alertText" :type="alertType" :duration="alertDuration" v-model="showAlert" />
+  <PopupAlert :text="alert.text" :type="alert.type" :duration="alert.duration" v-model="alert.show" />
 </template>
 
 <style scoped></style>

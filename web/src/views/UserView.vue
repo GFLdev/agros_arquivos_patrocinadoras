@@ -2,58 +2,88 @@
 import Header from '@/components/generic/HeaderSection.vue'
 import { PhEnvelopeSimple, PhMapPin, PhPhone } from '@phosphor-icons/vue'
 import AccordionComponent from '@/components/generic/AccordionComponent.vue'
-import { onBeforeMount, ref } from 'vue'
-import type { CategModel, FileModel, UserModel } from '@/@types/Responses.ts'
-import { getAllCategories, getAllFiles, getUserById } from '@/services/queries.ts'
+import { onBeforeMount, type Ref, ref } from 'vue'
+import type { CategModel, FileModel, GetAllResponse } from '@/@types/Responses.ts'
+import { getAllCategories, getAllFiles } from '@/services/queries.ts'
 import { useAuthStore } from '@/stores/authStore.ts'
 import FileItem from '@/components/generic/FileItem.vue'
 import { downloadFile } from '@/utils/file.ts'
+import PopupAlert from '@/components/generic/PopupAlert.vue'
+import { Alert, codeToAlertType } from '@/utils/modals.ts'
+import { AlertType } from '@/@types/Enumerations.ts'
 
-const authStore = useAuthStore()
+// Pinia Store
+const authStore: ReturnType<typeof useAuthStore> = useAuthStore()
 
-const user = ref<UserModel>({
-  user_id: '',
-  username: '',
-  name: '',
-  password: '',
-  updated_at: '',
-})
-const categs = ref<CategModel[]>([])
-const files = ref<Record<string, FileModel[]>>({})
+// Array das categorias
+const categs: Ref<CategModel[]> = ref<CategModel[]>([])
 
-const fetched = ref<Set<string>>(new Set<string>())
+// Mapeamento dos arquivos
+const files: Ref<Record<string, FileModel[]>> = ref<Record<string, FileModel[]>>({})
 
-onBeforeMount(() => {
-  // Obter dados do usuário
-  getUserById(authStore.user?.id ?? '').then((res) => {
-    user.value = res.data ?? {
-      user_id: '',
-      username: '',
-      name: '',
-      password: '',
-      updated_at: '',
+// Set para impedir múltiplas requisições no banco
+const fetched: Ref<Set<string>> = ref<Set<string>>(new Set<string>())
+
+// Alerta
+const alert: Ref<Alert> = ref<Alert>(new Alert())
+
+/**
+ * Lida com a obtenção de dados das categorias e gerencia tentativas em caso de erros.
+ *
+ * @param {number} [retries=0] - O número atual de tentativas para obter os dados das categorias.
+ * @param {number} [maxRetry=5] - O número máximo de tentativas para obter os dados das categorias.
+ * @param {number} [timeout=5000] - A duração do tempo limite (em milissegundos) antes de tentar novamente a
+ * solicitação.
+ * @return {Promise<void>} Uma promise que é resolvida quando os dados das categorias são obtidos com sucesso ou todas
+ * as tentativas são esgotadas.
+ */
+async function handleGetCategories(retries: number = 0, maxRetry: number = 5, timeout: number = 5000): Promise<void> {
+  if (retries >= maxRetry) return
+  try {
+    const res: GetAllResponse<CategModel> = await getAllCategories(authStore.user?.id ?? '')
+    if (res.code >= 400) {
+      alert.value.handleAlert(res.message, codeToAlertType(res.code))
+      setTimeout((): Promise<void> => handleGetCategories(retries + 1, timeout), timeout)
+    } else {
+      categs.value = res.data ?? []
     }
-  })
-  // Obter todas as categorias
-  getAllCategories(authStore.user?.id ?? '').then((res) => {
-    categs.value = res.data ?? []
-  })
-})
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+    setTimeout((): Promise<void> => handleGetCategories(retries + 1, timeout), timeout)
+  }
+}
 
-// Função para obter valores dos arquivos e armazenar em files
-function handleGetFiles(categId: string) {
+/**
+ * Busca e lida com os arquivos de um usuário e categoria específicos.
+ *
+ * @param {string} categId - O ID da categoria sob a qual os arquivos estão organizados.
+ * @return {Promise<void>} Uma promise que é resolvida assim que os arquivos forem processados ou rejeitada caso ocorra
+ * um erro durante a busca.
+ */
+async function handleGetFiles(categId: string): Promise<void> {
   if (fetched.value.has(categId) || !authStore.user) {
     return
   }
-  getAllFiles(authStore.user.id, categId).then((res) => {
-    files.value[categId] = res.data ?? []
-    fetched.value.add(categId)
-  })
+
+  try {
+    const res: GetAllResponse<FileModel> = await getAllFiles(authStore.user.id, categId)
+    if (res.code >= 400) {
+      alert.value.handleAlert(res.message, codeToAlertType(res.code))
+    } else {
+      files.value[categId] = res.data ?? []
+      fetched.value.add(categId)
+    }
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  }
 }
+
+// Obter todas as categorias
+onBeforeMount(handleGetCategories)
 </script>
 
 <template>
-  <Header :title="user?.name" />
+  <Header :title="authStore.user?.name" />
   <main
     class="flex w-full flex-col items-center justify-center gap-12 bg-gray bg-opacity-5 px-8 py-4 font-lato sm:px-16 sm:py-8"
   >
@@ -84,7 +114,9 @@ function handleGetFiles(categId: string) {
                 :name="file.name"
                 :mime-type="file.mimetype"
                 :last-modified="file.updated_at"
-                :download-handler="async () => await downloadFile(user.user_id, categ.categ_id, file.file_id)"
+                :download-handler="
+                  async () => await downloadFile(authStore.user?.id ?? '', categ.categ_id, file.file_id)
+                "
               />
             </div>
             <p v-else>Nenhum arquivo encontrado</p>
@@ -150,4 +182,6 @@ function handleGetFiles(categId: string) {
       </div>
     </section>
   </main>
+  <!-- Alerta -->
+  <PopupAlert :text="alert.text" :type="alert.type" :duration="alert.duration" v-model="alert.show" />
 </template>

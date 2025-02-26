@@ -1,16 +1,31 @@
 <script setup lang="ts">
+import type { PropType } from 'vue'
+import { PhXCircle } from '@phosphor-icons/vue'
+
 defineProps({
-  text: String,
-  disabled: Boolean,
-  leftInnerIcon: Object,
-  onClick: Function,
+  text: {
+    type: String,
+    default: 'Cancelar',
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  leftInnerIcon: {
+    type: Object,
+    default: PhXCircle,
+  },
+  onClick: {
+    type: Function as PropType<() => unknown>,
+    default: (): void => {},
+  },
 })
 </script>
 
 <template>
   <button
     type="button"
-    @click="onClick !== undefined && onClick()"
+    @click="onClick"
     :disabled="disabled"
     class="focus-visible:outline-offset inline-flex items-center gap-x-2 rounded-md bg-red px-3 py-1.5 text-white shadow-md drop-shadow-md transition duration-200 ease-in-out hover:bg-opacity-80 focus:-outline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-dark disabled:bg-dark disabled:bg-opacity-50"
   >

@@ -18,6 +18,10 @@ go.work.sum
 
 config.json
 
+.vite/
+
+bin/
+
 **/logs/
 **.log
 

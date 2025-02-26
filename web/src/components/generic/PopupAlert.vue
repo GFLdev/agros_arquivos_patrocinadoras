@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import { PhCheckCircle, PhInfo, PhWarningCircle, PhXCircle } from '@phosphor-icons/vue'
-import { computed, type PropType, ref, watch } from 'vue'
+import { computed, type ModelRef, type PropType, type Ref, ref, watch } from 'vue'
 import { AlertType } from '@/@types/Enumerations.ts'
 
-const props = defineProps({
+const props: {
+  readonly text: string
+  readonly duration: number
+  readonly type: AlertType
+} = defineProps({
   text: {
     type: String,
     required: true,
@@ -12,13 +16,13 @@ const props = defineProps({
     type: Number,
     default: 3000,
   },
-  type: Number as PropType<AlertType>,
+  type: {
+    type: Number as PropType<AlertType>,
+    default: AlertType.Info,
+  },
 })
 
-const closedCalled = ref<boolean>(false)
-
-const showModel = defineModel<boolean>()
-
+// Ícones para cada tipo de alerta
 const icons = {
   [AlertType.Success]: PhCheckCircle,
   [AlertType.Error]: PhXCircle,
@@ -26,6 +30,7 @@ const icons = {
   [AlertType.Info]: PhInfo,
 }
 
+// Estilos (tailwind) para cada tipo de alerta
 const styles = {
   [AlertType.Success]: `text-white bg-green`,
   [AlertType.Error]: `text-white bg-red`,
@@ -33,15 +38,27 @@ const styles = {
   [AlertType.Info]: `text-white bg-secondary`,
 }
 
-// Função para fechar popup
-function close() {
+// Estado para caso o alerta já tenha sido fechado. Usado para não ter
+// o bug visual de animação do alerta fechando mesmo que nunca tenha sido aberto
+const closedCalled: Ref<boolean> = ref<boolean>(false)
+
+// Estado de visibilidade
+const showModel: ModelRef<boolean | undefined> = defineModel<boolean>()
+
+/**
+ * Fecha a visualização do modelo atual e atualiza os indicadores de status.
+ *
+ * @return {void} Este método não retorna nenhum valor.
+ */
+function close(): void {
   closedCalled.value = true
   showModel.value = false
 }
 
+// Fechar alerta dada a sua duração
 watch(
-  () => showModel.value,
-  () => setTimeout(close, computed(() => props.duration).value),
+  (): boolean | undefined => showModel.value,
+  (): number => setTimeout(close, computed((): number => props.duration).value),
 )
 </script>
 
@@ -52,9 +69,9 @@ watch(
   >
     <div
       class="inline-flex h-fit w-max max-w-96 items-center gap-x-2 rounded-md px-5 py-2.5 shadow-md drop-shadow-md"
-      :class="`${type !== undefined ? styles[type] : styles[AlertType.Info]}`"
+      :class="styles[type]"
     >
-      <component :is="type !== undefined ? icons[type] : icons[AlertType.Info]" class="size-6" weight="fill" />
+      <component :is="icons[type]" class="size-6" weight="fill" />
       <p class="font-lato">{{ text }}</p>
     </div>
   </div>
