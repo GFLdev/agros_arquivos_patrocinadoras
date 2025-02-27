@@ -71,10 +71,11 @@ async function handleCreateFile(userId: string, categId: string): Promise<void> 
   }
 
   formExtension.value = '.' + (formFile.value.name.split('.').pop() ?? 'bin')
+
   const body: FileRequest = {
     name: formName.value,
     extension: formExtension.value,
-    mimetype: formFile.value.type,
+    mimetype: formFile.value.type.trim() !== '' ? formFile.value.type : 'application/octet-stream',
     content: await toBase64(formFile.value),
   }
 

@@ -44,7 +44,7 @@ export class Alert {
    * @param {number} [duration=3000] - A duração do alerta em milissegundos. O padrão é 3000.
    * @return {Alert} Uma instância da classe Alert.
    */
-  constructor(type: AlertType = AlertType.Info, duration: number = 3000): Alert {
+  constructor(type: AlertType = AlertType.Info, duration: number = 3000) {
     this.text = ''
     this.type = type
     this.duration = duration

@@ -86,15 +86,17 @@ async function handleUpdateFile(userId: string, categId: string, fileId: string)
     return
   }
 
+  let mimetype: string = ''
   if (!isFileEmpty(formFile.value)) {
     formExtension.value = '.' + (formFile.value.name.split('.').pop() ?? 'bin')
+    mimetype = formFile.value.type.trim() !== '' ? formFile.value.type : 'application/octet-stream'
   }
 
   const body: Partial<UpdateFileRequest> = {
     categ_id: formCateg.value,
     name: formName.value,
     extension: formExtension.value,
-    mimetype: formFile.value.type,
+    mimetype: mimetype,
     content: await toBase64(formFile.value),
   }
 

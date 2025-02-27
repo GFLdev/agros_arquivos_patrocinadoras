@@ -98,14 +98,16 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 			XFrameOptions:         "DENY",
 			HSTSMaxAge:            31536000, // 1 ano
 			HSTSPreloadEnabled:    true,
-			ContentSecurityPolicy: "default-src 'self'; script-src 'self'; style-src 'self'",
+			ContentSecurityPolicy: "script-src 'self'",
 		}),
 		middleware.Recover(),
 		// CORS
 		middleware.CORSWithConfig(corsConfig),
 		// Sistema de arquivos estáticos
 		middleware.StaticWithConfig(middleware.StaticConfig{
-			Filesystem: http.Dir("frontend/dist"),
+			Filesystem: http.Dir("web/dist/"),
+			HTML5:      true,
+			Browse:     true,
 		}),
 	)
 }

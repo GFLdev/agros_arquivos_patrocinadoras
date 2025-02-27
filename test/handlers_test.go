@@ -155,11 +155,12 @@ func TestHandlers_CreateCategory(t *testing.T) {
 	ctx := newContext()
 
 	// Criar usuário
-	userParams := app.LoginParams{
+	userData := app.UserData{
 		Username: "CategUser1",
+		Name:     "CategUser1",
 		Password: "test123456789",
 	}
-	userId, err := app.CreateUser(ctx, userParams)
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	// Mock
@@ -270,11 +271,12 @@ func TestHandlers_CreateFile(t *testing.T) {
 	ctx := newContext()
 
 	// Criar usuário e categoria
-	userParams := app.LoginParams{
+	userData := app.UserData{
 		Username: "FileUser1",
+		Name:     "FileUser1",
 		Password: "123456789",
 	}
-	userId, err := app.CreateUser(ctx, userParams)
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 	categParams := app.CategData{
 		UserId: userId,
@@ -394,8 +396,16 @@ func TestHandlers_CreateFile(t *testing.T) {
 func TestHandlers_ReadUser(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	user1Params := app.LoginParams{Username: "ReadUser1", Password: "123456789"}
-	user2Params := app.LoginParams{Username: "ReadUser2", Password: "123456789"}
+	user1Params := app.UserData{
+		Username: "ReadUser1",
+		Name:     "ReadUser1",
+		Password: "123456789",
+	}
+	user2Params := app.UserData{
+		Username: "ReadUser2",
+		Name:     "ReadUser2",
+		Password: "123456789",
+	}
 	user1Id, err := app.CreateUser(ctx, user1Params)
 	assert.NoError(t, err)
 	user2Id, err := app.CreateUser(ctx, user2Params)
@@ -501,8 +511,12 @@ func TestHandlers_ReadUser(t *testing.T) {
 func TestHandlers_ReadCategory(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	userParams := app.LoginParams{Username: "ReadCategUser", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "ReadCategUser",
+		Name:     "ReadCategUser",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	categ1Params := app.CategData{UserId: userId, Name: "ReadCateg1"}
@@ -660,8 +674,12 @@ func TestHandlers_ReadCategory(t *testing.T) {
 func TestHandlers_ReadFile(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	userParams := app.LoginParams{Username: "ReadFileUser", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "ReadFileUser",
+		Name:     "ReadFileUser",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	categParams := app.CategData{UserId: userId, Name: "ReadFileCateg"}
@@ -951,11 +969,12 @@ func TestHandlers_UpdateUser(t *testing.T) {
 	ctx := newContext()
 
 	// Criar usuário
-	userParams := app.LoginParams{
+	userData := app.UserData{
 		Username: "BeforeUser1",
+		Name:     "BeforeUser1",
 		Password: "123456789",
 	}
-	userId, err := app.CreateUser(ctx, userParams)
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	// Cenário positivo
@@ -985,7 +1004,7 @@ func TestHandlers_UpdateUser(t *testing.T) {
 			}
 
 			// Verificar os dados
-			newParams := app.LoginParams{Username: newName, Password: userParams.Password}
+			newParams := app.LoginParams{Username: newName, Password: userData.Password}
 			id, err := app.QueryLogin(ctx, newParams)
 			if assert.NoError(t, err) {
 				assert.Equal(t, userId, id)
@@ -1118,8 +1137,16 @@ func TestHandlers_UpdateCategory(t *testing.T) {
 	ctx := newContext()
 
 	// Criar usuários
-	user1Params := app.LoginParams{Username: "UpCategUser1", Password: "123456789"}
-	user2Params := app.LoginParams{Username: "UpCategUser2", Password: "123456789"}
+	user1Params := app.UserData{
+		Username: "UpCategUser1",
+		Name:     "UpCategUser1",
+		Password: "123456789",
+	}
+	user2Params := app.UserData{
+		Username: "UpCategUser2",
+		Name:     "UpCategUser2",
+		Password: "123456789",
+	}
 
 	user1Id, err := app.CreateUser(ctx, user1Params)
 	assert.NoError(t, err)
@@ -1257,8 +1284,12 @@ func TestHandlers_UpdateFile(t *testing.T) {
 
 	// Criar usuário e mock JSON
 	validUpdateJSON := `{"name": "UpdatedName"}`
-	userParams := app.LoginParams{Username: "UpFileUser1", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "UpFileUser1",
+		Name:     "UpFileUser1",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	// Criar categorias
@@ -1451,8 +1482,12 @@ func TestHandlers_UpdateFile(t *testing.T) {
 func TestHandlers_DeleteUser(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	userParams := app.LoginParams{Username: "DeleteUser", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "DeleteUser",
+		Name:     "DeleteUser",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	// Cenários positivos
@@ -1529,8 +1564,12 @@ func TestHandlers_DeleteUser(t *testing.T) {
 func TestHandlers_DeleteCategory(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	userParams := app.LoginParams{Username: "DeleteCategUser", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "DeleteCategUser",
+		Name:     "DeleteCategUser",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	categParams := app.CategData{UserId: userId, Name: "DeleteCateg"}
@@ -1657,8 +1696,12 @@ func TestHandlers_DeleteCategory(t *testing.T) {
 func TestHandlers_DeleteFile(t *testing.T) {
 	// Mock
 	ctx := newContext()
-	userParams := app.LoginParams{Username: "DeleteFileUser", Password: "123456789"}
-	userId, err := app.CreateUser(ctx, userParams)
+	userData := app.UserData{
+		Username: "DeleteFileUser",
+		Name:     "DeleteFileUser",
+		Password: "123456789",
+	}
+	userId, err := app.CreateUser(ctx, userData)
 	assert.NoError(t, err)
 
 	categParams := app.CategData{UserId: userId, Name: "DeleteFileCateg"}

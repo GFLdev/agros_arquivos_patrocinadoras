@@ -58,4 +58,10 @@ func ConfigRoutes(e *echo.Echo, ctx *context.Context) {
 	e.OPTIONS("/*", func(c echo.Context) error {
 		return c.NoContent(http.StatusOK)
 	})
+
+	// Rota de fallback para garantir que index.html seja carregado para todas as requisições
+	e.GET("/*", func(c echo.Context) error {
+		return c.File("web/dist/index.html")
+	})
+
 }
