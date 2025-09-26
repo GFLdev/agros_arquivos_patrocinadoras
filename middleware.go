@@ -47,7 +47,35 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 	}
 
 	// Redirecionamento para HTTPS
-	e.Pre(middleware.HTTPSRedirect())
+	var secureConfig middleware.SecureConfig
+	if ctx.Config.EnableTLS {
+		e.Pre(middleware.HTTPSRedirect())
+		secureConfig = middleware.SecureConfig{
+			XSSProtection:      "1; mode=block",
+			ContentTypeNosniff: "nosniff",
+			XFrameOptions:      "DENY",
+			HSTSMaxAge:         31536000, // 1 ano
+			HSTSPreloadEnabled: true,
+			ContentSecurityPolicy: "script-src " +
+				"default-src 'self'; " +
+				"img-src 'self' data:; " +
+				"script-src 'self'; " +
+				"style-src 'self'; ",
+		}
+	} else {
+		secureConfig = middleware.SecureConfig{
+			XSSProtection:      "1; mode=block",
+			ContentTypeNosniff: "nosniff",
+			XFrameOptions:      "DENY",
+			HSTSMaxAge:         0, // desligado
+			HSTSPreloadEnabled: false,
+			ContentSecurityPolicy: "" +
+				"default-src 'self'; " +
+				"img-src 'self' data:; " +
+				"script-src 'self'; " +
+				"style-src 'self'; ",
+		}
+	}
 
 	e.Use(
 		// Implementar app.AppWrapper
@@ -92,14 +120,7 @@ func ConfigMiddleware(e *echo.Echo, ctx *context.Context) {
 			middleware.NewRateLimiterMemoryStore(rate.Limit(20)),
 		),
 		// XSSProtection
-		middleware.SecureWithConfig(middleware.SecureConfig{
-			XSSProtection:         "1; mode=block",
-			ContentTypeNosniff:    "nosniff",
-			XFrameOptions:         "DENY",
-			HSTSMaxAge:            31536000, // 1 ano
-			HSTSPreloadEnabled:    true,
-			ContentSecurityPolicy: "script-src 'self'",
-		}),
+		middleware.SecureWithConfig(secureConfig),
 		middleware.Recover(),
 		// CORS
 		middleware.CORSWithConfig(corsConfig),

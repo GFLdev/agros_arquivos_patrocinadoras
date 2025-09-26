@@ -11,13 +11,15 @@ import (
 	"agros_arquivos_patrocinadoras/pkg/app/logger"
 	"database/sql"
 	"fmt"
-	"github.com/labstack/echo/v4"
-	"go.uber.org/zap"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
 	"syscall"
+
+	"github.com/labstack/echo/v4"
+	"go.uber.org/zap"
+	"golang.org/x/crypto/acme/autocert"
 )
 
 // Serve é responsável por iniciar o servidor HTTP da aplicação.
@@ -29,17 +31,28 @@ import (
 //     logger e dependências essenciais.
 func Serve(e *echo.Echo, ctx *context.Context) {
 	var err error
+	addr := ":" + strconv.Itoa(ctx.Config.Port)
+
 	if ctx.Config.Environment == "production" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de produção na porta %d", ctx.Config.Port))
-		err = e.StartAutoTLS(":" + strconv.Itoa(ctx.Config.Port))
+
+		if ctx.Config.EnableTLS {
+			e.AutoTLSManager = autocert.Manager{
+				Prompt: autocert.AcceptTOS,
+				Cache:  autocert.DirCache("./certs"),
+			}
+			err = e.StartAutoTLS(addr)
+		} else {
+			err = e.Start(addr)
+		}
 	} else if ctx.Config.Environment == "development" {
 		ctx.Logger.Info(fmt.Sprintf("Iniciando servidor de desenvolvimento na porta %d", ctx.Config.Port))
 
-		err = e.StartTLS(
-			":"+strconv.Itoa(ctx.Config.Port),
-			ctx.Config.CertFile,
-			ctx.Config.KeyFile,
-		)
+		if ctx.Config.EnableTLS {
+			err = e.StartTLS(addr, ctx.Config.CertFile, ctx.Config.KeyFile)
+		} else {
+			err = e.Start(addr)
+		}
 	} else {
 		err = fmt.Errorf("erro na configuração de ambiente")
 	}
@@ -137,6 +150,7 @@ func main() {
 		for {
 			e := echo.New()
 			e.HideBanner = true
+			e.HidePort = true
 			e.IPExtractor = echo.ExtractIPFromXFFHeader()
 			ConfigMiddleware(e, ctx)
 			ConfigRoutes(e, ctx)

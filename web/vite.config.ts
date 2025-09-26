@@ -12,11 +12,11 @@ dotenv.config()
 // https://vite.dev/config/
 export default defineConfig({
   server: {
-    https: {
-      key: fs.readFileSync(process.env.SSL_KEY ?? './key.pem', 'utf8'),
-      cert: fs.readFileSync(process.env.SSL_CERT ?? './cert.pem', 'utf8'),
-    },
-    host: '0.0.0.0',
+    // https: {
+    //   key: fs.readFileSync(process.env.SSL_KEY ?? './key.pem', 'utf8'),
+    //   cert: fs.readFileSync(process.env.SSL_CERT ?? './cert.pem', 'utf8'),
+    // },
+    host: '0.0.0.0'
   },
   plugins: [vue(), vueJsx(), vueDevTools()],
   resolve: {

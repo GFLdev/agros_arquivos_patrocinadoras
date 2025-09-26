@@ -181,6 +181,10 @@
       "type": "integer",
       "description": "Tempo de expiração para o token JWT, em minutos."
     },
+    "enable_tls": {
+      "type": "boolean",
+      "description": "Usar TLS ou não."
+    },
     "cert_file": {
       "type": "string",
       "description": "Caminho para o arquivo de certificado SSL (opcional)."
@@ -191,3 +195,4 @@
     }
   }
 }
+

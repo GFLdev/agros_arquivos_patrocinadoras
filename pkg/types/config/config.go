@@ -22,6 +22,8 @@ type Config struct {
 	JwtSecret string `json:"jwt_secret" validate:"required"`
 	// JwtExpires define, em minutos, o tempo de expiração para o token JWT.
 	JwtExpires int `json:"jwt_expires" validate:"required"`
+	// EnableTLS define se o servidor usará TLS ou não.
+	EnableTLS bool `json:"enable_tls"`
 	// CertFile contém o caminho para o arquivo de certificado SSL (opcional).
 	CertFile string `json:"cert_file"`
 	// KeyFile contém o caminho para o arquivo de chave SSL (opcional).
