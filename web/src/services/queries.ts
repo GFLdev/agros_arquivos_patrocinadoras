@@ -27,21 +27,19 @@ import router from '@/router'
  * status.
  */
 async function handleAxiosError(error: unknown, entityName: string = 'Entidade'): Promise<QueryResponse> {
-  const SERVER_ERROR_MSG = 'Erro no servidor. Tente novamente mais tarde.'
-  const UNAUTHORIZED_MSG = 'Credenciais inválidas.'
-  const CONFLICTM_MSG = `${entityName} já existe.`
-  const UNKNOWN_ERROR_MSG = 'Erro desconhecido. Tente novamente mais tarde.'
+  const SERVER_ERROR_MSG: string = 'Erro no servidor. Tente novamente mais tarde.'
+  const UNAUTHORIZED_MSG: string = 'Credenciais inválidas.'
+  const CONFLICT_MSG: string = `${entityName} já existe.`
+  const UNKNOWN_ERROR_MSG: string = 'Erro desconhecido. Tente novamente mais tarde.'
 
   const axiosError: AxiosError = error as AxiosError
   if (!axiosError.response) {
     return { message: SERVER_ERROR_MSG, code: 500 }
-  }
-
-  if (axiosError.response.status === 401) {
+  } else if (axiosError.response.status === 401) {
     await router.push({ name: 'login', replace: true })
     return { message: UNAUTHORIZED_MSG, code: 401 }
   } else if (axiosError.response.status === 409) {
-    return { message: CONFLICTM_MSG, code: 409 }
+    return { message: CONFLICT_MSG, code: 409 }
   }
 
   return {
@@ -59,7 +57,7 @@ async function handleAxiosError(error: unknown, entityName: string = 'Entidade')
  */
 export async function createUser(body: UserRequest): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<CreateResponse, never> = await apiClient.post('/auth/user', body)
+    const res: AxiosResponse<CreateResponse, unknown> = await apiClient.post('/auth/user', body)
     return { message: res.data.message, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e, 'Usuário')
@@ -76,7 +74,7 @@ export async function createUser(body: UserRequest): Promise<QueryResponse> {
  */
 export async function createCategory(userId: string, body: CategRequest): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<CreateResponse, never> = await apiClient.post(`/auth/user/${userId}/category`, body)
+    const res: AxiosResponse<CreateResponse, unknown> = await apiClient.post(`/auth/user/${userId}/category`, body)
     return { message: res.data.message, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e, 'Categoria')
@@ -94,7 +92,7 @@ export async function createCategory(userId: string, body: CategRequest): Promis
  */
 export async function createFile(userId: string, categId: string, body: FileRequest): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<CreateResponse, never> = await apiClient.post(
+    const res: AxiosResponse<CreateResponse, unknown> = await apiClient.post(
       `/auth/user/${userId}/category/${categId}/file`,
       body,
     )
@@ -112,29 +110,27 @@ export async function createFile(userId: string, categId: string, body: FileRequ
  */
 export async function getAllUsers(): Promise<GetAllResponse<UserModel>> {
   try {
-    const res: AxiosResponse<UserModel[], never> = await apiClient.get('/auth/user')
+    const res: AxiosResponse<UserModel[], unknown> = await apiClient.get('/auth/user')
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Usuários obtidos com sucesso.' : 'Nenhum usuário encontrado.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
 export async function getUserById(userId: string): Promise<GetOneResponse<UserModel>> {
   try {
-    const res: AxiosResponse<UserModel, never> = await apiClient.get(`/auth/user/${userId}`)
+    const res: AxiosResponse<UserModel, unknown> = await apiClient.get(`/auth/user/${userId}`)
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Usuário obtido com sucesso.' : 'Usuário não encontrado.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
@@ -147,15 +143,14 @@ export async function getUserById(userId: string): Promise<GetOneResponse<UserMo
  */
 export async function getAllCategories(userId: string): Promise<GetAllResponse<CategModel>> {
   try {
-    const res: AxiosResponse<CategModel[], never> = await apiClient.get(`/auth/user/${userId}/category`)
+    const res: AxiosResponse<CategModel[], unknown> = await apiClient.get(`/auth/user/${userId}/category`)
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Categorias obtidas com sucesso.' : 'Nenhuma categoria encontrada.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
@@ -169,15 +164,14 @@ export async function getAllCategories(userId: string): Promise<GetAllResponse<C
  */
 export async function getCategoryById(userId: string, categId: string): Promise<GetOneResponse<CategModel>> {
   try {
-    const res: AxiosResponse<CategModel, never> = await apiClient.get(`/auth/user/${userId}/category/${categId}`)
+    const res: AxiosResponse<CategModel, unknown> = await apiClient.get(`/auth/user/${userId}/category/${categId}`)
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Categoria obtida com sucesso.' : 'Categoria não encontrada.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
@@ -191,15 +185,16 @@ export async function getCategoryById(userId: string, categId: string): Promise<
  */
 export async function getAllFiles(userId: string, categId: string): Promise<GetAllResponse<FileModel>> {
   try {
-    const res: AxiosResponse<FileModel[], never> = await apiClient.get(`/auth/user/${userId}/category/${categId}/file`)
+    const res: AxiosResponse<FileModel[], unknown> = await apiClient.get(
+      `/auth/user/${userId}/category/${categId}/file`,
+    )
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Arquivos obtidos com sucesso.' : 'Nenhum arquivo encontrado.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
@@ -214,17 +209,16 @@ export async function getAllFiles(userId: string, categId: string): Promise<GetA
  */
 export async function getFileById(userId: string, categId: string, fileId: string): Promise<GetOneResponse<FileModel>> {
   try {
-    const res: AxiosResponse<FileModel, never> = await apiClient.get(
+    const res: AxiosResponse<FileModel, unknown> = await apiClient.get(
       `/auth/user/${userId}/category/${categId}/file/${fileId}`,
     )
     return {
-      data: res.data ?? null,
+      data: res.data,
       message: res.data ? 'Arquivo obtido com sucesso.' : 'Arquivo não encontrado.',
       code: res.data ? 200 : 204,
     }
   } catch (e: unknown) {
-    const { message, code } = await handleAxiosError(e)
-    return { data: null, message, code }
+    return { data: null, ...(await handleAxiosError(e)) }
   }
 }
 
@@ -232,13 +226,13 @@ export async function getFileById(userId: string, categId: string, fileId: strin
  * Atualiza os detalhes de um usuário com o ID especificado.
  *
  * @param {string} userId - O identificador único do usuário a ser atualizado.
- * @param {UserRequest} body - O corpo da requisição contendo as informações atualizadas do usuário.
+ * @param {Partial<UserRequest>} body - O corpo da requisição contendo as informações atualizadas do usuário.
  * @return {Promise<QueryResponse>} Uma Promise que resolve para a resposta contendo o status da atualização e uma
  * mensagem.
  */
-export async function updateUser(userId: string, body: UserRequest): Promise<QueryResponse> {
+export async function updateUser(userId: string, body: Partial<UserRequest>): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.patch(`/auth/user/${userId}`, body)
+    const res: AxiosResponse<string, unknown> = await apiClient.patch(`/auth/user/${userId}`, body)
     return { message: res.data, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e)
@@ -250,17 +244,17 @@ export async function updateUser(userId: string, body: UserRequest): Promise<Que
  *
  * @param {string} userId - O ID do usuário ao qual a categoria pertence.
  * @param {string} categId - O ID da categoria a ser atualizada.
- * @param {UpdateCategRequest} body - Os dados para atualizar a categoria.
+ * @param {Partial<UpdateCategRequest>} body - Os dados para atualizar a categoria.
  * @return {Promise<QueryResponse>} Uma Promise que resolve para a resposta contendo a mensagem e o código de status, ou
  * uma resposta de erro caso a requisição falhe.
  */
 export async function updateCategory(
   userId: string,
   categId: string,
-  body: UpdateCategRequest,
+  body: Partial<UpdateCategRequest>,
 ): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.patch(`/auth/user/${userId}/category/${categId}`, body)
+    const res: AxiosResponse<string, unknown> = await apiClient.patch(`/auth/user/${userId}/category/${categId}`, body)
     return { message: res.data, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e)
@@ -273,7 +267,7 @@ export async function updateCategory(
  * @param {string} userId - O ID do usuário que possui o arquivo.
  * @param {string} categId - O ID da categoria à qual o arquivo pertence.
  * @param {string} fileId - O ID do arquivo a ser atualizado.
- * @param {UpdateFileRequest} body - O corpo da requisição contendo os dados do arquivo a serem atualizados.
+ * @param {Partial<UpdateFileRequest>} body - O corpo da requisição contendo os dados do arquivo a serem atualizados.
  * @return {Promise<QueryResponse>} Uma Promise que resolve para um objeto contendo o status da operação, mensagem e
  * código de resposta.
  */
@@ -281,10 +275,10 @@ export async function updateFile(
   userId: string,
   categId: string,
   fileId: string,
-  body: UpdateFileRequest,
+  body: Partial<UpdateFileRequest>,
 ): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.patch(
+    const res: AxiosResponse<string, unknown> = await apiClient.patch(
       `/auth/user/${userId}/category/${categId}/file/${fileId}`,
       body,
     )
@@ -303,7 +297,7 @@ export async function updateFile(
  */
 export async function deleteUser(userId: string): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.delete(`/auth/user/${userId}`)
+    const res: AxiosResponse<string, unknown> = await apiClient.delete(`/auth/user/${userId}`)
     return { message: res.data, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e)
@@ -320,7 +314,7 @@ export async function deleteUser(userId: string): Promise<QueryResponse> {
  */
 export async function deleteCategory(userId: string, categId: string): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.delete(`/auth/user/${userId}/category/${categId}`)
+    const res: AxiosResponse<string, unknown> = await apiClient.delete(`/auth/user/${userId}/category/${categId}`)
     return { message: res.data, code: res.status }
   } catch (e: unknown) {
     return handleAxiosError(e)
@@ -338,7 +332,7 @@ export async function deleteCategory(userId: string, categId: string): Promise<Q
  */
 export async function deleteFile(userId: string, categId: string, fileId: string): Promise<QueryResponse> {
   try {
-    const res: AxiosResponse<string, never> = await apiClient.delete(
+    const res: AxiosResponse<string, unknown> = await apiClient.delete(
       `/auth/user/${userId}/category/${categId}/file/${fileId}`,
     )
     return { message: res.data, code: res.status }

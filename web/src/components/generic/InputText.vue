@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { getCurrentInstance } from 'vue'
+import { getCurrentInstance, type ModelRef } from 'vue'
 
 defineProps({
   label: {
@@ -10,13 +10,25 @@ defineProps({
     type: String,
     required: true,
   },
-  leftInnerIcon: Object,
-  disabled: Boolean,
-  required: Boolean,
+  leftInnerIcon: {
+    type: Object,
+    required: false,
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  required: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const model = defineModel<string | null | undefined>()
-const uid = getCurrentInstance()!.uid
+// UID da instância do componente atual
+const uid: number = getCurrentInstance()!.uid
+
+// Valor do input
+const model: ModelRef<string | undefined> = defineModel<string>()
 </script>
 
 <template>

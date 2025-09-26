@@ -11,12 +11,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/term"
 	"os"
 	"strings"
+	"syscall"
 	"time"
 )
 
-func getAdmin(ctx *context.Context, username string) (uuid.UUID, error) {
+func getAdmin(ctx *context.Context) (uuid.UUID, error) {
 	// Verificar se usuário de administrador está no banco
 	schema := ctx.Config.Database.Schema
 	query := fmt.Sprintf(
@@ -29,7 +31,7 @@ func getAdmin(ctx *context.Context, username string) (uuid.UUID, error) {
 
 	// Obtenção da linha
 	var userId uuid.UUID
-	row := ctx.DB.QueryRow(query, sql.Named("username", username))
+	row := ctx.DB.QueryRow(query, sql.Named("username", ctx.Config.AdminUsername))
 	err := row.Scan(&userId)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		return uuid.Nil, fmt.Errorf("não existe o usuário administrador")
@@ -40,7 +42,7 @@ func getAdmin(ctx *context.Context, username string) (uuid.UUID, error) {
 	return userId, nil
 }
 
-func resetPassword(ctx *context.Context, username, password string) error {
+func resetPassword(ctx *context.Context, password string) error {
 	var successMsg string
 	schema := ctx.Config.Database.Schema
 	tx, err := ctx.DB.Begin()
@@ -66,10 +68,10 @@ func resetPassword(ctx *context.Context, username, password string) error {
 	ts := time.Now().Unix()
 
 	// Verifica se há o usuário como administrador
-	adminId, err := getAdmin(ctx, username)
+	adminId, err := getAdmin(ctx)
 	if err != nil {
-		ctx.Logger.Info("Administrador '" + username + "' não foi encontrado. Fazendo o cadastro.")
-		successMsg = "Administrador '" + username + "' foi criado com sucesso."
+		ctx.Logger.Info("Administrador '" + ctx.Config.AdminUsername + "' não foi encontrado. Fazendo o cadastro.")
+		successMsg = "Administrador '" + ctx.Config.AdminUsername + "' foi criado com sucesso."
 		adminId = uuid.New()
 		insert := fmt.Sprintf(
 			`INSERT INTO %s.%s (%s, %s, %s, %s, %s)
@@ -87,7 +89,7 @@ func resetPassword(ctx *context.Context, username, password string) error {
 		_, err = tx.Exec(
 			insert,
 			sql.Named("user_id", adminId.String()),
-			sql.Named("username", username),
+			sql.Named("username", ctx.Config.AdminUsername),
 			sql.Named("name", ctx.Config.AdminName),
 			sql.Named("password", hash),
 			sql.Named("updated_at", ts),
@@ -97,8 +99,8 @@ func resetPassword(ctx *context.Context, username, password string) error {
 			return fmt.Errorf("não foi possível criar usuário")
 		}
 	} else {
-		ctx.Logger.Info("Administrador '" + username + "' foi encontrado. Fazendo atualização.")
-		successMsg = "Administrador '" + username + "' foi atualizado com sucesso."
+		ctx.Logger.Info("Administrador '" + ctx.Config.AdminUsername + "' foi encontrado. Fazendo atualização.")
+		successMsg = "Administrador '" + ctx.Config.AdminUsername + "' foi atualizado com sucesso."
 		update := fmt.Sprintf(
 			`UPDATE %s.%s
 			SET %s = :password, %s = :updated_at
@@ -168,31 +170,38 @@ func main() {
 		DB:     dataBase,
 	}
 
-	// Input de nome de usuário e senha
-	var adminName, newPassword string
+	// Input de senha
+	var newPassword, confirmPassword string
 	ok := false
 
 	for !ok {
-		fmt.Print("\nNome do usuário administrador: (default: admin) ")
-		if _, err = fmt.Scanln(&adminName); err != nil {
-			adminName = "admin"
-		}
-		fmt.Print("Nova senha do administrador: (>= 4 caracteres) ")
-		if _, err = fmt.Scanln(&newPassword); err != nil {
+		fmt.Print("\nNova senha do administrador: (>= 4 caracteres) ")
+		bytePw, err := term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
 			fmt.Print("Senha não pode ser vazia. Finalizando.")
 			return
 		}
+		newPassword = string(bytePw)
 		if len(newPassword) < 4 {
 			fmt.Print("Senha não pode ter menos de 4 caracteres. Finalizando.")
 			return
 		}
 
+		// Confirmar senha
+		fmt.Print("\nConfirmar senha: ")
+		bytePw, err = term.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			fmt.Print("Senha não pode ser vazia. Finalizando.")
+			return
+		}
+		confirmPassword = string(bytePw)
+		if newPassword != confirmPassword {
+			fmt.Printf("As senhas não coincidem. Tente novamente.\n")
+			continue
+		}
+
 		// Confirmação
-		fmt.Printf(
-			"\nNome selecionado: %s\nSenha selecionada: %s\nDeseja continuar? [S/n] (default: n) ",
-			adminName,
-			newPassword,
-		)
+		fmt.Print("\nDeseja continuar? [S/n] (default: n) ")
 
 		var i string
 		_, err = fmt.Scanln(&i)
@@ -205,7 +214,7 @@ func main() {
 	fmt.Println()
 
 	// Cadastrar nova senha
-	if err = resetPassword(ctx, adminName, newPassword); err != nil {
+	if err = resetPassword(ctx, newPassword); err != nil {
 		logr.Error("Erro ao repor senha de administrador", zap.Error(err))
 		return
 	}

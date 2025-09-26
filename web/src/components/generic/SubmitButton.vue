@@ -1,12 +1,27 @@
 <script setup lang="ts">
-import { PhCircleNotch } from '@phosphor-icons/vue'
+import { PhCircleNotch, PhPaperPlaneTilt } from '@phosphor-icons/vue'
 
 defineProps({
-  text: String,
-  loading: Boolean,
-  loadingText: String,
-  disabled: Boolean,
-  leftInnerIcon: Object,
+  text: {
+    type: String,
+    required: true,
+  },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
+  loadingText: {
+    type: String,
+    default: 'Carregando...',
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  leftInnerIcon: {
+    type: Object,
+    default: PhPaperPlaneTilt,
+  },
 })
 </script>
 

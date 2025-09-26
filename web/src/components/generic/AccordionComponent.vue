@@ -1,31 +1,78 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, type ModelRef, nextTick, onBeforeUnmount, onMounted, type PropType, type Ref, ref } from 'vue'
 import { PhCaretDown, PhPencil, PhTrash } from '@phosphor-icons/vue'
 
-const props = defineProps({
-  title: String,
-  admin: Boolean,
-  first: Boolean,
-  last: Boolean,
-  editHandler: Function,
-  deleteHandler: Function,
-  contentHeight: Number,
+const props: {
+  readonly title: string
+  readonly admin: boolean
+  readonly first: boolean
+  readonly last: boolean
+  readonly editHandler: () => unknown
+  readonly deleteHandler: () => unknown
+  readonly contentHeight: number
+} = defineProps({
+  title: {
+    type: String,
+    required: true,
+  },
+  admin: {
+    type: Boolean,
+    default: false,
+  },
+  first: {
+    type: Boolean,
+    default: true,
+  },
+  last: {
+    type: Boolean,
+    default: true,
+  },
+  editHandler: {
+    type: Function as PropType<() => unknown>,
+    default: (): void => {},
+  },
+  deleteHandler: {
+    type: Function as PropType<() => unknown>,
+    default: (): void => {},
+  },
+  contentHeight: {
+    type: Number,
+    default: 0,
+  },
 })
 
-const open = ref<boolean>(false)
-const maxContentHeight = ref<number>(0)
+// Estado de abertura do accordion
+const open: Ref<boolean> = ref<boolean>(false)
 
-const contentNode = ref<Node | null>(null)
-const observer = ref<MutationObserver | null>(null)
+// Observador
+const observer: Ref<MutationObserver | undefined> = ref<MutationObserver>()
 
-const heightModel = defineModel<number | null>()
+// Estado para cálculo da altura máxima do conteúdo interno
+const maxContentHeight: Ref<number> = ref<number>(0)
 
-const toggle = () => {
+// Nó do conteúdo interno do accordion
+const contentNode: Ref<Node | undefined> = ref<Node>()
+
+// Altura máxima do conteúdo interno do accordion
+const heightModel: ModelRef<number | undefined> = defineModel<number>()
+
+/**
+ * Alterna o estado do valor 'open' entre true e false.
+ *
+ * @return {void} Não retorna nenhum valor.
+ */
+function toggle(): void {
   open.value = !open.value
 }
 
-// Calcula altura do conteúdo dinamicamente
-async function adjustHeight() {
+/**
+ * Ajusta dinamicamente a altura de um contêiner com base no conteúdo e no estado.
+ * Esta função é assíncrona e garante que as atualizações do DOM sejam tratadas corretamente
+ * antes de ajustar a altura.
+ *
+ * @return {Promise<void>} Uma promessa que é resolvida quando o ajuste de altura é concluído.
+ */
+async function adjustHeight(): Promise<void> {
   await nextTick()
   if (contentNode.value) {
     const el = contentNode.value as HTMLElement
@@ -35,10 +82,18 @@ async function adjustHeight() {
   }
 }
 
+// Fechar observador
+onBeforeUnmount((): void => {
+  if (observer.value) observer.value.disconnect()
+})
+
+// Definir observador na primeira renderização
 onMounted(() => {
-  observer.value = new MutationObserver(async () => {
+  observer.value = new MutationObserver(async (): Promise<void> => {
     await adjustHeight()
   })
+
+  // Observar quaisquer mudanças no nó do conteúdo interno do accordion
   if (contentNode.value) {
     observer.value.observe(contentNode.value, {
       childList: true,
@@ -46,12 +101,6 @@ onMounted(() => {
       attributes: true,
       characterData: true,
     })
-  }
-})
-
-onBeforeUnmount(() => {
-  if (observer.value) {
-    observer.value.disconnect()
   }
 })
 </script>
@@ -74,7 +123,7 @@ onBeforeUnmount(() => {
             @click.prevent="
               (e) => {
                 e.stopPropagation()
-                editHandler !== undefined && editHandler()
+                editHandler()
               }
             "
             class="z-10 rounded-lg p-1 text-green text-opacity-80 transition-all duration-200 ease-in-out hover:bg-green hover:bg-opacity-70 hover:text-white"
@@ -85,7 +134,7 @@ onBeforeUnmount(() => {
             @click.prevent="
               (e) => {
                 e.stopPropagation()
-                deleteHandler !== undefined && deleteHandler()
+                deleteHandler()
               }
             "
             class="z-10 rounded-lg p-1 text-red text-opacity-80 transition-all duration-200 ease-in-out hover:bg-red hover:bg-opacity-70 hover:text-white"

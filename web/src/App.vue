@@ -3,11 +3,11 @@ import { RouterView } from 'vue-router'
 import { onMounted } from 'vue'
 import { useAuthStore } from '@/stores/authStore.ts'
 
-const authStore = useAuthStore()
+// Pinia Store
+const authStore: ReturnType<typeof useAuthStore> = useAuthStore()
 
-onMounted(async () => {
-  await authStore.getSession()
-})
+// Obter sessão, para todos os componentes da SPA
+onMounted(authStore.getSession)
 </script>
 
 <template>

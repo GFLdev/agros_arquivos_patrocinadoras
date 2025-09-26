@@ -1,13 +1,20 @@
 <script setup lang="ts">
-import { getCurrentInstance, watch } from 'vue'
+import { getCurrentInstance, type ModelRef, type PropType, watch } from 'vue'
 
-const props = defineProps({
+const props: {
+  readonly label: string
+  readonly values: Record<string, string>
+  readonly selected: string
+  readonly leftInnerIcon?: object
+  readonly disabled: boolean
+  readonly required: boolean
+} = defineProps({
   label: {
     type: String,
     required: true,
   },
   values: {
-    type: Map<string, string>,
+    type: Object as PropType<Record<string, string>>,
     required: true,
   },
   selected: {
@@ -19,17 +26,19 @@ const props = defineProps({
   required: Boolean,
 })
 
-const model = defineModel<string>()
-const uid = getCurrentInstance()!.uid
+// UID da instância do componente atual
+const uid: number = getCurrentInstance()!.uid
 
+// Valor do input
+const model: ModelRef<string | undefined> = defineModel<string>()
+
+// Definir opção selecionada
 watch(
-  () => props.selected,
-  (newValue) => {
-    if (model.value !== newValue) {
-      model.value = newValue
-    }
+  (): string => props.selected,
+  (newValue: string): void => {
+    if (model.value !== newValue) model.value = newValue
   },
-  { immediate: true }, // Executa mesmo na primeira renderização
+  { immediate: true }, // executa até na primeira renderização
 )
 </script>
 
@@ -44,7 +53,7 @@ watch(
       :required="required"
       :disabled="disabled"
     >
-      <option v-for="[key, value] of values" :key="key" :value="key" :disabled="key === selected">
+      <option v-for="(value, key) in values" :key="key" :value="key" :disabled="key === selected">
         {{ value }}
       </option>
     </select>

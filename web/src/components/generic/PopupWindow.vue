@@ -1,17 +1,27 @@
 <script setup lang="ts">
 import { PhX } from '@phosphor-icons/vue'
-import { ref } from 'vue'
+import { type ModelRef, type Ref, ref } from 'vue'
 
 defineProps({
-  title: String,
+  title: {
+    type: String,
+    required: true,
+  },
 })
 
-const closedCalled = ref<boolean>(false)
+// Estado para caso a janela já tenha sido fechada. Usado para não ter
+// o bug visual de animação da janela fechando mesmo que nunca tenha sido aberta
+const closedCalled: Ref<boolean> = ref<boolean>(false)
 
-const showModel = defineModel<boolean>()
+// Estado de visibilidade
+const showModel: ModelRef<boolean | undefined> = defineModel<boolean>()
 
-// Função para fechar popup
-function close() {
+/**
+ * Fecha o modelo atual atualizando as variáveis de estado relevantes.
+ *
+ * @return {void} Este método não retorna nenhum valor.
+ */
+function close(): void {
   closedCalled.value = true
   showModel.value = false
 }
@@ -33,7 +43,7 @@ function close() {
       <button class="absolute -right-4 top-0 transition-colors duration-200 hover:text-red" @click="close">
         <PhX size="24" />
       </button>
-      <h2 class="text-center text-xl font-light">{{ title?.toUpperCase() }}</h2>
+      <h2 class="text-center text-xl font-light">{{ title.toUpperCase() }}</h2>
     </div>
     <div>
       <slot />

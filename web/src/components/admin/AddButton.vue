@@ -1,10 +1,20 @@
 <script setup lang="ts">
 import { PhPlus } from '@phosphor-icons/vue'
+import type { PropType } from 'vue'
 
 defineProps({
-  text: String,
-  disabled: Boolean,
-  onClick: Function,
+  text: {
+    type: String,
+    required: true,
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  onClick: {
+    type: Function as PropType<() => unknown>,
+    default: (): void => {},
+  },
 })
 </script>
 

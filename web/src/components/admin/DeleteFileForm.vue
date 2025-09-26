@@ -3,12 +3,12 @@ import PopupWindow from '@/components/generic/PopupWindow.vue'
 import { PhFileMinus, PhXCircle } from '@phosphor-icons/vue'
 import SubmitButton from '@/components/generic/SubmitButton.vue'
 import CancelButton from '@/components/generic/CancelButton.vue'
-import { type PropType, ref } from 'vue'
+import { type EmitFn, type ModelRef, type PropType, type Ref, ref } from 'vue'
 import { deleteFile } from '@/services/queries.ts'
-import type { CategModel, FileModel } from '@/@types/Responses.ts'
+import type { CategModel, FileModel, QueryResponse } from '@/@types/Responses.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
-import { codeToAlertType } from '@/utils/modals.ts'
+import { Alert, codeToAlertType } from '@/utils/modals.ts'
 
 defineProps({
   categ: {
@@ -21,42 +21,38 @@ defineProps({
   },
 })
 
-const emits = defineEmits(['submitted'])
+// Emissores
+const emits: EmitFn<'submitted'[]> = defineEmits(['submitted'])
 
-// Validações
-const loading = ref<boolean>(false)
-
-// Estado de visibilidade
-const showModel = defineModel<boolean>()
+// Status de carregamento
+const isLoading: Ref<boolean> = ref<boolean>(false)
 
 // Alerta
-const showAlert = ref<boolean>(false)
-const alertType = ref<AlertType>(AlertType.Info)
-const alertText = ref<string>('')
-const alertDuration = ref<number>(3000)
+const alert: Ref<Alert> = ref<Alert>(new Alert())
 
-// Gerenciar alerta
-function handleAlert(text: string, type: AlertType = AlertType.Info, duration: number = 3000) {
-  alertText.value = text
-  alertType.value = type
-  alertDuration.value = duration
-  showAlert.value = true
-}
+// Estado de visibilidade
+const showModel: ModelRef<boolean | undefined> = defineModel<boolean>()
 
-// Função para abrir janela de exclusão de arquivo
-async function handleDeleteFile(userId: string, categId: string, fileId: string) {
-  loading.value = true
+/**
+ * Lida com a exclusão de um arquivo para um usuário e categoria específicos.
+ *
+ * @param {string} userId O identificador único do usuário solicitando a exclusão do arquivo.
+ * @param {string} categId O identificador único da categoria à qual o arquivo pertence.
+ * @param {string} fileId O identificador único do arquivo a ser excluído.
+ * @return {Promise<void>} Uma promessa que é resolvida quando o processo de exclusão do arquivo é concluído.
+ */
+async function handleDeleteFile(userId: string, categId: string, fileId: string): Promise<void> {
+  isLoading.value = true
 
   try {
-    const res = await deleteFile(userId, categId, fileId)
-    handleAlert(res.message, codeToAlertType(res.code))
+    const res: QueryResponse = await deleteFile(userId, categId, fileId)
+    alert.value.handleAlert(res.message, codeToAlertType(res.code))
     emits('submitted')
     showModel.value = false
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
   } finally {
-    loading.value = false
+    isLoading.value = false
   }
 }
 </script>
@@ -80,20 +76,20 @@ async function handleDeleteFile(userId: string, categId: string, fileId: string)
         <CancelButton
           text="Cancelar"
           :on-click="() => (showModel = false)"
-          :disabled="loading"
+          :disabled="isLoading"
           :left-inner-icon="PhXCircle"
         />
         <SubmitButton
           text="Excluir"
           loading-text="Excluindo"
-          :loading="loading"
-          :disabled="loading"
+          :loading="isLoading"
+          :disabled="isLoading"
           :left-inner-icon="PhFileMinus"
         />
       </div>
     </form>
   </PopupWindow>
-  <PopupAlert :text="alertText" :type="alertType" :duration="alertDuration" v-model="showAlert" />
+  <PopupAlert :text="alert.text" :type="alert.type" :duration="alert.duration" v-model="alert.show" />
 </template>
 
 <style scoped></style>

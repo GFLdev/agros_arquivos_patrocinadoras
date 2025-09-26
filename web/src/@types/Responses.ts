@@ -1,8 +1,3 @@
-export interface ErrorResponse {
-  error: string
-  message: string
-}
-
 export interface LoginResponse {
   token: string
   message: string
@@ -33,10 +28,6 @@ export interface FileModel {
   mimetype: string
   blob: string
   updated_at: number
-}
-
-export interface MessageResponse {
-  message: string
 }
 
 export interface CreateResponse {

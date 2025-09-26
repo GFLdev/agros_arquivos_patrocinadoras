@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import Header from '@/components/generic/HeaderSection.vue'
 import AccordionComponent from '@/components/generic/AccordionComponent.vue'
-import { onBeforeMount, ref } from 'vue'
-import type { CategModel, FileModel, UserModel } from '@/@types/Responses.ts'
+import { onBeforeMount, type Ref, ref } from 'vue'
+import type { CategModel, FileModel, GetAllResponse, UserModel } from '@/@types/Responses.ts'
 import { getAllCategories, getAllFiles, getAllUsers } from '@/services/queries.ts'
 import AddButton from '@/components/admin/AddButton.vue'
 import CreateUserForm from '@/components/admin/CreateUserForm.vue'
@@ -18,130 +18,127 @@ import { downloadFile } from '@/utils/file.ts'
 import UpdateFileForm from '@/components/admin/UpdateFileForm.vue'
 import { AlertType } from '@/@types/Enumerations.ts'
 import PopupAlert from '@/components/generic/PopupAlert.vue'
-import { codeToAlertType } from '@/utils/modals.ts'
+import { Alert, codeToAlertType } from '@/utils/modals.ts'
 
 // Dados do banco
-const users = ref<UserModel[]>([])
-const categs = ref<Record<string, CategModel[]>>({})
-const files = ref<Record<string, FileModel[]>>({})
+const users: Ref<UserModel[]> = ref<UserModel[]>([])
+const categs: Ref<Record<string, CategModel[]>> = ref<Record<string, CategModel[]>>({})
+const files: Ref<Record<string, FileModel[]>> = ref<Record<string, FileModel[]>>({})
 
 // Set para impedir múltiplas requisições no banco
-const fetched = ref<Set<string>>(new Set<string>())
+const fetched: Ref<Set<string>> = ref<Set<string>>(new Set<string>())
 
 // ID's selecionados
-const selectedUser = ref<UserModel>({
-  user_id: '',
-  username: '',
-  name: '',
-  password: '',
-  updated_at: '',
-})
-const selectedCateg = ref<CategModel>({
-  categ_id: '',
-  user_id: '',
-  name: '',
-  updated_at: '',
-})
-const selectedFile = ref<FileModel>({
-  file_id: '',
-  categ_id: '',
-  name: '',
-  extension: '',
-  mimetype: '',
-  blob: '',
-  updated_at: 0,
-})
+const selectedUser: Ref<UserModel | undefined> = ref<UserModel>()
+const selectedCateg: Ref<CategModel | undefined> = ref<CategModel>()
+const selectedFile: Ref<FileModel | undefined> = ref<FileModel>()
 
 // Mapeamento para o formulário de atualização
-const selectedUsersMap = ref<Map<string, string>>(new Map<string, string>())
-const selectedCategsMap = ref<Map<string, string>>(new Map<string, string>())
+const selectedUsersRec: Ref<Record<string, string>> = ref<Record<string, string>>({})
+const selectedCategsRec: Ref<Record<string, string>> = ref<Record<string, string>>({})
 
 // Estados para abrir janelas
-const showCreateUser = ref<boolean>(false)
-const showCreateCateg = ref<boolean>(false)
-const showCreateFile = ref<boolean>(false)
+const showCreateUser: Ref<boolean> = ref<boolean>(false)
+const showCreateCateg: Ref<boolean> = ref<boolean>(false)
+const showCreateFile: Ref<boolean> = ref<boolean>(false)
 
-const showUpdateUser = ref<boolean>(false)
-const showUpdateCateg = ref<boolean>(false)
-const showUpdateFile = ref<boolean>(false)
+const showUpdateUser: Ref<boolean> = ref<boolean>(false)
+const showUpdateCateg: Ref<boolean> = ref<boolean>(false)
+const showUpdateFile: Ref<boolean> = ref<boolean>(false)
 
-const showDeleteUser = ref<boolean>(false)
-const showDeleteCateg = ref<boolean>(false)
-const showDeleteFile = ref<boolean>(false)
+const showDeleteUser: Ref<boolean> = ref<boolean>(false)
+const showDeleteCateg: Ref<boolean> = ref<boolean>(false)
+const showDeleteFile: Ref<boolean> = ref<boolean>(false)
 
 // Hack para animação dos accordions aninhados
-const contentHeight = ref<number>(0)
+const contentHeight: Ref<number> = ref<number>(0)
 
 // Alerta
-const showAlert = ref<boolean>(false)
-const alertType = ref<AlertType>(AlertType.Info)
-const alertText = ref<string>('')
-const alertDuration = ref<number>(3000)
+const alert: Ref<Alert> = ref<Alert>(new Alert())
 
-// Gerenciar alerta
-function handleAlert(text: string, type: AlertType = AlertType.Info, duration: number = 3000) {
-  alertText.value = text
-  alertType.value = type
-  alertDuration.value = duration
-  showAlert.value = true
-}
-
-// Função para obter valores dos usuários e armazenar em users
-async function handleGetUsers() {
+/**
+ * Lida com a obtenção de dados de usuários e gerencia tentativas em caso de erros.
+ *
+ * @param {number} [retries=0] - O número atual de tentativas para obter os dados do usuário.
+ * @param {number} [maxRetry=5] - O número máximo de tentativas para obter os dados do usuário.
+ * @param {number} [timeout=5000] - A duração do tempo limite (em milissegundos) antes de tentar novamente a
+ * solicitação.
+ * @return {Promise<void>} Uma promise que é resolvida quando os dados do usuário são obtidos com sucesso ou todas as
+ * tentativas são esgotadas.
+ */
+async function handleGetUsers(retries: number = 0, maxRetry: number = 5, timeout: number = 5000): Promise<void> {
+  if (retries >= maxRetry) return
   try {
-    const res = await getAllUsers()
-    users.value = res.data ?? []
+    const res: GetAllResponse<UserModel> = await getAllUsers()
     if (res.code >= 400) {
-      handleAlert(res.message, codeToAlertType(res.code))
+      alert.value.handleAlert(res.message, codeToAlertType(res.code))
+      setTimeout((): Promise<void> => handleGetUsers(retries + 1, timeout), timeout)
+    } else {
+      users.value = res.data ?? []
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+    setTimeout((): Promise<void> => handleGetUsers(retries + 1, timeout), timeout)
   }
 }
 
-// Função para obter valores das categorias e armazenar em categs
-async function handleGetCategories(userId: string, reset = false) {
+/**
+ * Lida com a recuperação de categorias para um usuário específico.
+ *
+ * @param {string} userId - O identificador único do usuário para o qual as categorias serão recuperadas.
+ * @param {boolean} [reset=false] - Indica se deve redefinir e buscar as categorias, mesmo que elas já tenham sido
+ * buscadas.
+ * @return {Promise<void>} Uma promise que é resolvida assim que as categorias são recuperadas e armazenadas ou um erro
+ * é tratado.
+ */
+async function handleGetCategories(userId: string, reset: boolean = false): Promise<void> {
   if (!reset && fetched.value.has(userId)) {
     return
   }
 
   try {
-    const res = await getAllCategories(userId)
-    categs.value[userId] = res.data ?? []
-    fetched.value.add(userId)
+    const res: GetAllResponse<CategModel> = await getAllCategories(userId)
     if (res.code >= 400) {
-      handleAlert(res.message, codeToAlertType(res.code))
+      alert.value.handleAlert(res.message, codeToAlertType(res.code))
+    } else {
+      categs.value[userId] = res.data ?? []
+      fetched.value.add(userId)
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
   }
 }
 
-// Função para obter valores dos arquivos e armazenar em files
-async function handleGetFiles(userId: string, categId: string, reset = false) {
+/**
+ * Busca e lida com os arquivos de um usuário e categoria específicos.
+ *
+ * @param {string} userId - O ID do usuário para quem os arquivos estão sendo recuperados.
+ * @param {string} categId - O ID da categoria sob a qual os arquivos estão organizados.
+ * @param {boolean} [reset=false] - Indica se deve forçar uma nova solicitação para buscar os arquivos, ignorando
+ * qualquer dado em cache.
+ * @return {Promise<void>} Uma promise que é resolvida assim que os arquivos forem processados ou rejeitada caso ocorra
+ * um erro durante a busca.
+ */
+async function handleGetFiles(userId: string, categId: string, reset: boolean = false): Promise<void> {
   if (!reset && fetched.value.has(categId)) {
     return
   }
 
   try {
-    const res = await getAllFiles(userId, categId)
-    files.value[categId] = res.data ?? []
-    fetched.value.add(categId)
+    const res: GetAllResponse<FileModel> = await getAllFiles(userId, categId)
     if (res.code >= 400) {
-      handleAlert(res.message, codeToAlertType(res.code))
+      alert.value.handleAlert(res.message, codeToAlertType(res.code))
+    } else {
+      files.value[categId] = res.data ?? []
+      fetched.value.add(categId)
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  } catch (_) {
-    handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
+  } catch {
+    alert.value.handleAlert('Erro desconhecido. Tente novamente mais tarde.', AlertType.Error)
   }
 }
 
-onBeforeMount(() => {
-  // Obter todos os usuários
-  handleGetUsers()
-})
+// Obter todos os usuários antes da primeira renderização
+onBeforeMount(handleGetUsers)
 </script>
 
 <template>
@@ -199,7 +196,7 @@ onBeforeMount(() => {
                 () => {
                   selectedUser = user
                   selectedCateg = categ
-                  users.map((u) => selectedUsersMap.set(u.user_id, u.name))
+                  users.map((u) => (selectedUsersRec[u.user_id] = u.name))
                   showUpdateCateg = true
                 }
               "
@@ -227,7 +224,7 @@ onBeforeMount(() => {
                         selectedUser = user
                         selectedCateg = categ
                         selectedFile = file
-                        categs[user.user_id].map((c) => selectedCategsMap.set(c.categ_id, c.name))
+                        categs[user.user_id].map((c) => (selectedCategsRec[c.categ_id] = c.name))
                         showUpdateFile = true
                       }
                     "
@@ -274,44 +271,50 @@ onBeforeMount(() => {
   </main>
   <!-- Janelas de usuário -->
   <CreateUserForm v-model="showCreateUser" @submitted="handleGetUsers" />
-  <UpdateUserForm v-model="showUpdateUser" :user="selectedUser" @submitted="handleGetUsers" />
-  <DeleteUserForm v-model="showDeleteUser" :user="selectedUser" @submitted="handleGetUsers" />
+  <UpdateUserForm v-if="selectedUser" v-model="showUpdateUser" :user="selectedUser" @submitted="handleGetUsers" />
+  <DeleteUserForm v-if="selectedUser" v-model="showDeleteUser" :user="selectedUser" @submitted="handleGetUsers" />
   <!-- Janelas de categoria -->
   <CreateCategoryForm
+    v-if="selectedUser"
     v-model="showCreateCateg"
     :user="selectedUser"
-    @submitted="() => handleGetCategories(selectedUser.user_id, true)"
+    @submitted="() => handleGetCategories(selectedUser?.user_id ?? '', true)"
   />
   <UpdateCategoryForm
+    v-if="selectedCateg"
     v-model="showUpdateCateg"
     :categ="selectedCateg"
-    :users="selectedUsersMap"
+    :users="selectedUsersRec"
     @submitted="() => users.map((u) => handleGetCategories(u.user_id, true))"
   />
   <DeleteCategoryForm
+    v-if="selectedCateg"
     v-model="showDeleteCateg"
     :categ="selectedCateg"
-    @submitted="() => handleGetCategories(selectedUser.user_id, true)"
+    @submitted="() => handleGetCategories(selectedUser?.user_id ?? '', true)"
   />
   <!-- Janelas de arquivo -->
   <CreateFileForm
+    v-if="selectedCateg"
     v-model="showCreateFile"
     :categ="selectedCateg"
-    @submitted="() => handleGetFiles(selectedCateg.user_id, selectedCateg.categ_id, true)"
+    @submitted="() => handleGetFiles(selectedCateg?.user_id ?? '', selectedCateg?.categ_id ?? '', true)"
   />
   <UpdateFileForm
+    v-if="selectedCateg && selectedFile"
     v-model="showUpdateFile"
     :categ="selectedCateg"
     :file="selectedFile"
-    :categs="selectedCategsMap"
-    @submitted="() => categs[selectedCateg.user_id].map((c) => handleGetFiles(c.user_id, c.categ_id, true))"
+    :categs="selectedCategsRec"
+    @submitted="() => categs[selectedCateg?.user_id ?? ''].map((c) => handleGetFiles(c.user_id, c.categ_id, true))"
   />
   <DeleteFileForm
+    v-if="selectedCateg && selectedFile"
     v-model="showDeleteFile"
     :categ="selectedCateg"
     :file="selectedFile"
-    @submitted="() => handleGetFiles(selectedCateg.user_id, selectedCateg.categ_id, true)"
+    @submitted="() => handleGetFiles(selectedCateg?.user_id ?? '', selectedCateg?.categ_id ?? '', true)"
   />
   <!-- Alerta -->
-  <PopupAlert :text="alertText" :type="alertType" :duration="alertDuration" v-model="showAlert" />
+  <PopupAlert :text="alert.text" :type="alert.type" :duration="alert.duration" v-model="alert.show" />
 </template>

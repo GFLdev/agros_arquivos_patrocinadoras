@@ -1,7 +1,8 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type Router } from 'vue-router'
 import LoginView from '@/views/LoginView.vue'
 
-const router = createRouter({
+// A instância é responsável por gerenciar a configuração das rotas da aplicação e o estado de navegação.
+const router: Router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
@@ -12,12 +13,12 @@ const router = createRouter({
     {
       path: '/admin',
       name: 'admin',
-      component: () => import('@/views/AdminView.vue'),
+      component: (): Promise<typeof import('@/views/AdminView.vue')> => import('@/views/AdminView.vue'),
     },
     {
       path: '/user/:id',
       name: 'user',
-      component: () => import('@/views/UserView.vue'),
+      component: (): Promise<typeof import('@/views/UserView.vue')> => import('@/views/UserView.vue'),
     },
   ],
 })

@@ -3,10 +3,14 @@ import Logo from '/logo.svg'
 import { PhSignOut } from '@phosphor-icons/vue'
 import { useAuthStore } from '@/stores/authStore.ts'
 defineProps({
-  title: String,
+  title: {
+    type: String,
+    default: 'Espaço Patrocinadora',
+  },
 })
 
-const authStore = useAuthStore()
+// Pinia Store
+const authStore: ReturnType<typeof useAuthStore> = useAuthStore()
 </script>
 
 <template>
@@ -18,7 +22,7 @@ const authStore = useAuthStore()
         <img :src="Logo" class="w-[200px]" alt="Logo Agros" />
       </div>
       <div class="text-center sm:justify-self-center">
-        <h1 class="text-2xl text-white sm:text-3xl">{{ title ?? 'Espaço Patrocinadora' }}</h1>
+        <h1 class="text-2xl text-white sm:text-3xl">{{ title }}</h1>
       </div>
       <div class="justify-self-end">
         <button

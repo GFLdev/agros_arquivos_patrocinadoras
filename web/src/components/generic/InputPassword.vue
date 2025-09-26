@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import { PhEye, PhEyeClosed } from '@phosphor-icons/vue'
-import { getCurrentInstance, onMounted, ref, watchEffect } from 'vue'
+import { getCurrentInstance, type ModelRef, onMounted, type Ref, ref, watchEffect } from 'vue'
 
-const props = defineProps({
+const props: {
+  readonly label: string
+  readonly placeholder: string
+  readonly leftInnerIcon?: object
+  readonly disabled: boolean
+  readonly required: boolean
+  readonly showable: boolean
+} = defineProps({
   label: {
     type: String,
     required: true,
@@ -11,22 +18,38 @@ const props = defineProps({
     type: String,
     required: true,
   },
-  leftInnerIcon: Object,
-  disabled: Boolean,
-  required: Boolean,
-  showable: Boolean,
-  matched: Boolean,
+  leftInnerIcon: {
+    type: Object,
+    required: false,
+  },
+  disabled: {
+    type: Boolean,
+    default: false,
+  },
+  required: {
+    type: Boolean,
+    default: false,
+  },
+  showable: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const model = defineModel<string | null | undefined>()
-const visible = ref<boolean>(false)
-const uid = getCurrentInstance()!.uid
+// UID da instância do componente atual
+const uid: number = getCurrentInstance()!.uid
 
-onMounted(() => {
+// Visibilidade da senha
+const visible: Ref<boolean> = ref<boolean>(false)
+
+// Valor do input
+const model: ModelRef<string | undefined> = defineModel<string>()
+
+// Na primeira renderização
+onMounted((): void => {
+  // Se o input for desabilitado, a visibilidade da senha será false
   watchEffect(() => {
-    if (props.disabled) {
-      visible.value = false
-    }
+    if (props.disabled) visible.value = false
   })
 })
 </script>

@@ -17,6 +17,18 @@ import {
   PhVideo,
 } from '@phosphor-icons/vue'
 
+/**
+ * Um objeto de mapeamento que associa tipos MIME aos seus respectivos componentes correspondentes. Este mapeamento
+ * é usado para determinar qual componente deve ser renderizado com base no tipo MIME de um arquivo.
+ *
+ * Tipos MIME suportados incluem:
+ * - Imagens: Diversos formatos de imagem (e.g., GIF, PNG, JPEG, SVG, WebP).
+ * - Vídeos: Múltiplos formatos de vídeo (e.g., MP4, AVI, WMV).
+ * - Áudios: Diversos formatos de áudio (e.g., MP3, WAV, FLAC, AAC).
+ * - PDF: Documentos em PDF.
+ * - Arquivos comprimidos: ZIP, RAR e outros formatos comprimidos.
+ * - Arquivos de texto e documentos: Inclui arquivos Word, Excel, PowerPoint, texto simples e CSV.
+ */
 const mimeTypeMap: Record<string, Component> = {
   // Imagens
   'image/gif': PhGif,
@@ -104,15 +116,29 @@ const mimeTypeMap: Record<string, Component> = {
   'text/plain': PhFileText,
 }
 
+/**
+ * Converte um objeto File em uma string codificada em Base64 usando FileReader.
+ *
+ * @param {File} file - O arquivo a ser convertido em uma string Base64.
+ * @return {Promise<string>} Uma promise que resolve com a string codificada em Base64 do arquivo fornecido.
+ */
 export function toBase64(file: File): Promise<string> {
   return new Promise((resolve, reject): void => {
     const reader: FileReader = new FileReader()
     reader.readAsDataURL(file)
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = (e: ProgressEvent<FileReader>) => reject(e)
+    reader.onload = (): void => resolve((reader.result as string).split(',')[1]) // apenas os bytes base64
+    reader.onerror = (e: ProgressEvent<FileReader>): void => reject(e)
   })
 }
 
+/**
+ * Converte uma string codificada em Base64 em um objeto `Blob`.
+ *
+ * @param {string} b64Data - A string codificada em Base64 a ser convertida.
+ * @param {string} [contentType=''] - O tipo MIME dos dados. Por padrão, uma string vazia.
+ * @param {number} [sliceSize=512] - O tamanho de cada bloco usado durante o processamento. Por padrão, 512.
+ * @return {Blob} Um novo objeto Blob contendo os dados binários.
+ */
 export function toBlob(b64Data: string, contentType: string = '', sliceSize: number = 512): Blob {
   // Base64 para binário
   const byteCharacters: string = atob(b64Data)
@@ -134,6 +160,15 @@ export function toBlob(b64Data: string, contentType: string = '', sliceSize: num
   return new Blob(byteArrays, { type: contentType })
 }
 
+/**
+ * Baixa um arquivo para o usuário e a categoria especificados com base no ID do arquivo.
+ *
+ * @param {string} userId - O ID do usuário solicitando o arquivo.
+ * @param {string} categId - O ID da categoria à qual o arquivo pertence.
+ * @param {string} fileId - O ID do arquivo a ser baixado.
+ * @return {Promise<void>} Uma promise que é resolvida quando o arquivo é baixado ou se a operação falhar
+ * silenciosamente.
+ */
 export async function downloadFile(userId: string, categId: string, fileId: string): Promise<void> {
   try {
     const res: GetOneResponse<FileModel> = await getFileById(userId, categId, fileId)
@@ -155,6 +190,13 @@ export async function downloadFile(userId: string, categId: string, fileId: stri
   }
 }
 
+/**
+ * Recupera um componente de ícone de arquivo com base no tipo MIME fornecido.
+ *
+ * @param {string} mimetype - O tipo MIME do arquivo para o qual o ícone é necessário.
+ * @return {Component} O componente de ícone de arquivo correspondente, ou um ícone padrão se não for encontrada
+ * correspondência.
+ */
 export function fileIcon(mimetype: string): Component {
   return mimeTypeMap[mimetype] || PhFile
 }

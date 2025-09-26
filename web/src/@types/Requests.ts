@@ -1,12 +1,10 @@
-export interface LoginRequest {
+export interface CredentialsRequest {
   username: string
   password: string
 }
 
-export interface UserRequest {
-  username: string
+export interface UserRequest extends CredentialsRequest {
   name: string
-  password: string
 }
 
 export interface CategRequest {
